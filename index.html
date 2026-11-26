@@ -8,54 +8,71 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.4 system-ui,-apple-system,Roboto,sans-serif}
-.cam{position:relative;background:#000;aspect-ratio:4/3;max-height:58vh;width:100%;overflow:hidden}
+.cam{position:relative;background:#000;aspect-ratio:4/3;max-height:56vh;width:100%;overflow:hidden}
 video{width:100%;height:100%;object-fit:cover;display:block}
 .frame{position:absolute;inset:12% 8%;border:3px solid #fff8;border-radius:14px;pointer-events:none;transition:border-color .15s}
 .frame.hit{border-color:var(--ok)}
-.hud{position:absolute;left:0;right:0;bottom:0;padding:10px 14px;background:linear-gradient(#0000,#000c);font-weight:700;font-size:16px}
+.hud{position:absolute;left:0;right:0;bottom:0;padding:10px 112px 12px 14px;background:linear-gradient(#0000,#000d);font-weight:700;font-size:16px;min-height:64px;display:flex;align-items:flex-end}
 .top{position:absolute;top:10px;right:10px;display:flex;gap:8px}
+.cap{position:absolute;right:12px;bottom:12px;width:88px;height:88px;border-radius:50%;background:#fff;color:#000;border:5px solid #ffffff66;font-size:15px;font-weight:800;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1;box-shadow:0 2px 10px #0008}
+.cap b{font-size:30px;line-height:1}
+.cap.busy{background:#ffd60a}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
+.flash.on{opacity:.8;transition:none}
 button{font:700 16px system-ui;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 14px;min-height:48px;cursor:pointer}
 button.pri{background:var(--blue);border-color:var(--blue)}
 button.on{background:#ffd60a;color:#000}
 button.stopb{background:#b3261e;border-color:#b3261e}
-.wrap{padding:12px 14px 40px;max-width:640px;margin:0 auto}
+.wrap{padding:10px 14px 40px;max-width:640px;margin:0 auto}
 .start{display:flex;flex-direction:column;gap:10px;align-items:stretch;padding:24px 14px}
 .start p{color:var(--mute);margin:0}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .row button{flex:1}
+.lotbar{display:flex;gap:8px;align-items:stretch;margin-bottom:10px}
+.lotbar label{display:flex;align-items:center;gap:8px;flex:1;background:#0a0a0c;border:2px solid var(--blue);border-radius:12px;padding:0 12px;min-height:58px}
+.lotbar label span{font-weight:800;color:var(--mute);font-size:14px;letter-spacing:.06em}
+.lotbar input{flex:1;min-width:0;background:none;border:0;color:#fff;font:800 30px ui-monospace,Menlo,monospace;outline:none;padding:0}
+.lotbar button{min-width:64px;font-size:18px}
 .item{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center}
 .item.new{border-color:var(--ok)}
 .item.need{border-color:var(--warn)}
 .upc{font:600 13px ui-monospace,Menlo,monospace;color:var(--mute)}
-.pn{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.lotc{display:inline-flex;align-items:center;gap:2px;background:#0a0a0c;border:1px solid var(--line);border-radius:8px;padding:0 6px;color:var(--ink)}
+.lotc input{width:4.2em;background:none;border:0;color:#fff;font:800 14px ui-monospace,Menlo,monospace;padding:2px 0;outline:none}
+.pn{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}
 .pn input{font:800 20px ui-monospace,Menlo,monospace;width:9.5em;max-width:100%;padding:6px 8px;border-radius:9px;border:1px solid var(--line);background:#0a0a0c;color:#fff;text-transform:uppercase}
 .pn input.acd{font-size:15px;width:11em}
-.item button{min-height:40px;padding:6px 10px;font-size:14px}
+.item button{min-height:44px;padding:6px 10px;font-size:15px}
 .sent{font-size:12px;color:var(--ok)}
 .st{font-size:12px;color:var(--warn)}.st.bad{color:var(--bad)}
 .btns{display:flex;gap:6px}
-.pic{position:fixed;inset:0;background:#0b0c0f;z-index:9;display:flex;flex-direction:column;gap:10px;padding:14px;overflow:auto}
-.pic img{width:100%;border-radius:10px;background:#fff}
-.pic .pn input{font-size:24px}
+.sheet{position:fixed;inset:0;background:#0b0c0fee;z-index:9;display:flex;flex-direction:column;gap:12px;padding:16px;overflow:auto}
+.sheet img{width:100%;border-radius:10px;background:#fff}
+.sheet .pn input{font-size:24px}
+.sheet h3{margin:0;font-size:20px}
+.bigin{font:800 40px ui-monospace,Menlo,monospace;width:100%;padding:10px 14px;border-radius:12px;border:2px solid var(--blue);background:#0a0a0c;color:#fff}
+.sheet button{min-height:60px;font-size:19px}
 h2{font-size:16px;margin:18px 0 4px;display:flex;align-items:center;gap:8px}
 h2 span{margin-left:auto;font-size:13px;color:var(--mute)}
 .msg{color:var(--mute);font-size:14px;margin-top:8px}
-.toast{position:fixed;left:12px;right:12px;bottom:14px;background:#0a7d3c;color:#fff;border-radius:14px;padding:12px 14px;font-weight:700;opacity:0;transition:.2s;pointer-events:none;text-align:center}
+.toast{position:fixed;left:12px;right:12px;bottom:14px;background:#0a7d3c;color:#fff;border-radius:14px;padding:12px 14px;font-weight:700;opacity:0;transition:.2s;pointer-events:none;text-align:center;z-index:20}
 .toast.on{opacity:1}.toast.bad{background:#b3261e}
 </style>
 </head><body>
 <div id="startv" class="start">
   <h1 style="margin:0;font-size:24px">Label Camera</h1>
-  <p>Point at a GM, ACDelco, Ford, Motorcraft or Mopar label. It grabs the UPC barcode right away, reads the part number in the background, and double-beeps when it's sure. If it can't read one, the picture is kept so you can type the number later. Then tap <b>Send to scanner</b> and tap <b>📥</b> in the Iowa scanner to teach it every UPC at once.</p>
+  <p>Type the lot number, then point at a GM, ACDelco, Ford, Motorcraft or Mopar label. It grabs the barcode right away, reads the part number from the label, and double-beeps when it's sure. If it won't read live, tap the big white <b>Capture</b> button: it takes a sharp full photo and reads that in the background while you keep going. Tap <b>Send to scanner</b>, then <b>📥</b> in the Iowa scanner.</p>
   <button class="pri" id="go">Start camera</button>
   <p id="sup"></p>
 </div>
 <div id="camv" hidden>
-  <div class="cam"><video id="vid" playsinline muted autoplay></video><div class="frame" id="frame"></div>
+  <div class="cam"><video id="vid" playsinline muted autoplay></video><div class="frame" id="frame"></div><div class="flash" id="flash"></div>
     <div class="top"><button id="torch" hidden>Light</button><button id="pause">Pause</button><button id="stop" class="stopb">Stop camera</button></div>
-    <div class="hud" id="hud">Starting…</div></div>
+    <div class="hud" id="hud">Starting…</div>
+    <button class="cap" id="cap"><b>📸</b>Capture</button></div>
 </div>
 <div class="wrap">
+  <div class="lotbar"><label><span>LOT</span><input id="lot" inputmode="numeric" autocomplete="off" placeholder="—"></label><button id="lotdn">−1</button><button id="lotup" class="pri">Next</button></div>
   <div class="row"><button class="pri" id="send">Send to scanner</button><button id="copy">Copy list</button></div>
   <div class="msg" id="msg"></div>
   <h2>Labels read <span id="cnt"></span></h2>
@@ -69,16 +86,30 @@ h2 span{margin-left:auto;font-size:13px;color:var(--mute)}
 const SCANNER='https://claude.ai/artifact/FoodK6kYyaWVeGxvGg7qQe';
 const $=id=>document.getElementById(id);
 const LS={get(k,d){try{const v=localStorage.getItem('lc_'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('lc_'+k,JSON.stringify(v))}catch(e){}}};
-// item: {upc,at,part,brand,alt,ok,altOk,manual,gaveUp,sent,v:{field:{value:count}}}
-let items=LS.get('items',[]).map(i=>{if(i.part===undefined&&(i.gm||i.other||i.acd)){i.part=i.gm||i.other||i.acd;i.brand=i.gm?'GM':(i.other?'':'ACDelco');i.alt=i.gm?(i.acd||''):'';i.altOk=i.acdOk;delete i.gm;delete i.acd;delete i.other;delete i.acdOk;i.v=null}return i});
+// item: {id,upc,lot,at,part,brand,alt,ok,altOk,manual,gaveUp,sent,v:{field:{value:count}}}
+let items=LS.get('items',[]).map(i=>{if(i.part===undefined&&(i.gm||i.other||i.acd)){i.part=i.gm||i.other||i.acd;i.brand=i.gm?'GM':(i.other?'':'ACDelco');i.alt=i.gm?(i.acd||''):'';i.altOk=i.acdOk;delete i.gm;delete i.acd;delete i.other;delete i.acdOk;i.v=null}if(!i.id)i.id=i.upc||('p'+i.at);return i});
 const save=()=>LS.set('items',items);
-let stream=null,track=null,det=null,worker=null,paused=false,busy=false,wake=null;
+let lot=LS.get('lot','');
+let stream=null,track=null,det=null,paused=false,busy=false,wake=null,imgCap=null;
 let ac=null;
 function beep(seq){try{ac=ac||new AudioContext();if(ac.state==='suspended')ac.resume();for(const[f,t,d]of seq){const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.connect(g);g.connect(ac.destination);const s=ac.currentTime+t;g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.35,s+.008);g.gain.exponentialRampToValueAtTime(.0001,s+d);o.start(s);o.stop(s+d+.03)}}catch(e){}}
-const S={hit:[[1319,0,.07],[1760,.075,.12]],seen:[[1175,0,.06]],need:[[330,0,.15],[247,.18,.2]],send:[[784,0,.08],[1047,.08,.08],[1319,.16,.14]]};
+const S={hit:[[1319,0,.07],[1760,.075,.12]],seen:[[1175,0,.06]],need:[[330,0,.15],[247,.18,.2]],send:[[784,0,.08],[1047,.08,.08],[1319,.16,.14]],shut:[[2093,0,.04],[1568,.05,.05]]};
 let toastT;function toast(t,bad){const el=$('toast');el.textContent=t;el.className='toast on'+(bad?' bad':'');clearTimeout(toastT);toastT=setTimeout(()=>el.className='toast',2600)}
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function normUpc(r){const d=String(r).replace(/\D/g,'');if(d.length===12)return d;if(d.length===13&&d[0]==='0')return d.slice(1);if(d.length===11)return '0'+d;return null}
+function normUpc(r){const d=String(r).replace(/\D/g,'');if(String(r).replace(/\s/g,'').length!==d.length)return null;if(d.length===12)return d;if(d.length===13&&d[0]==='0')return d.slice(1);if(d.length===11)return '0'+d;return null}
+
+// ---------- part numbers printed as barcodes (Ford P-codes, Mopar, Motorcraft) ----------
+function fordify(u){let m;
+  if(m=u.match(/^([A-Z0-9]{4})-?(\d{1,3}[A-Z]{0,2}\d{2,4}[A-Z0-9]{0,3})-?([A-Z]{1,3}\d?)$/))if(/[A-Z]/.test(m[1])&&(m[1][3]==='Z'||u.includes('-')))return m[1]+'-'+m[2]+'-'+m[3];
+  return null}
+function codePart(raw){
+  let m,u=String(raw).replace(/[\u0000-\u001f]/g,'').trim().replace(/^\][A-Za-z]\d/,'').toUpperCase().replace(/\s+/g,'');
+  if(!u||/^Q\d{1,5}$/.test(u)||/^HTTP/.test(u)||/^\d+$/.test(u))return null;
+  if(/^P[A-Z0-9]{3}Z-?\d/.test(u))u=u.slice(1);
+  let f=fordify(u);if(f)return{part:f,brand:'Ford'};
+  if((m=u.match(/^P?(\d{8}A[A-Z])(-?\d{3})?$/)))return{part:m[1],brand:'Mopar'};
+  if(/^P?[A-Z]{2,4}-\d[0-9A-Z]{0,6}(-\d{2,4})?$/.test(u))return{part:u.replace(/^P(?=[A-Z]{2,4}-)/,''),brand:'Motorcraft'};
+  return null}
 
 // ---------- reading the printed part numbers ----------
 // Formats seen on this auction's boxes:
@@ -101,14 +132,16 @@ function parseText(t){
     if(!r.acd&&(m=L.match(/A?[CO]?[DO0P]\s*#\s*([A-Z0-9][A-Z0-9\- ]{2,16})/))){const v=m[1].replace(/ /g,'').replace(/-+$/,'');if(/\d/.test(v)&&v.length>=4)r.acd=v}
   }
   if(!r.acd){for(const L of lines){if(/QTY|LC\s?\d|GR\./.test(L))continue;const c=L.match(ACD_RE);if(c){r.acd=c[1];break}}}
-  if((m=T.match(FORD_RE)))r.ford=m[1]+'-'+m[2]+'-'+m[3];
+  if((m=T.match(FORD_RE))){let a=m[1];if(/[A-Z]/.test(a.slice(0,a.length-1))&&/[27]$/.test(a))a=a.slice(0,-1)+'Z';r.ford=a+'-'+m[2]+'-'+m[3]}
   if((m=T.match(/(?<![0-9A-Z])(\d{8}A[A-Z])(?![0-9A-Z])/)))r.mopar=m[1];
-  if(!r.gm&&!r.ford){const c=(T.match(/(?<![\dA-Z.\-])[1-9]\d{7}(?![\dA-Z.\-])/g)||[]).filter(x=>!UPCISH.test(x));if(c.length)r.gm=c[0]}
+  else if((m=T.match(/(?<![0-9A-Z])(\d{4}) ?(\d{4}) ?(A[A-Z])(?![0-9A-Z])/)))r.mopar=m[1]+m[2]+m[3];
+  if(!r.gm&&(m=T.match(/[A-Z]\d{2}-\d{3}-[A-Z0-9]{2}\s+(\d{4})\s?(\d{4})(?![\dA-Z])/)))r.gm=m[1]+m[2]; // dealer bin sticker
+  if(!r.gm&&!r.ford){const c=(T.match(/(?<![\dA-Z.\-])[1-9]\d{7}(?![\dA-Z.\-])/g)||[]).filter(x=>!UPCISH.test(x)&&!/^20[0-3]\d(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/.test(x));if(c.length)r.gm=c[0]}
   if(!r.gm){for(const mm of T.matchAll(MC_RE)){if(MC_NOT.test(mm[1]))continue;const v=mm[1]+'-'+mm[2];if(r.acd===v||(r.ford&&r.ford.startsWith(v)))continue;r.mc=v;break}}
   return r;
 }
 const FIELDS=['gm','ford','mopar','mc','acd'];
-const NEED={gm:2,ford:2,mopar:2,mc:2,acd:3};
+const NEED={gm:2,ford:2,mopar:2,mc:2,acd:2};
 function topOf(o,need){const e=Object.entries(o||{}).sort((a,b)=>b[1]-a[1]);if(!e.length)return null;const n2=e[1]?e[1][1]:0;return{val:e[0][0],ok:(e[0][1]>=need&&n2===0)||(e[0][1]>=need+1&&e[0][1]>=2*n2)}}
 function derive(it){
   const t={};for(const f of FIELDS)t[f]=topOf(it.v[f],NEED[f]);
@@ -122,142 +155,297 @@ function derive(it){
   it.part=part.val;it.brand=brand;it.ok=part.ok;
   it.alt=alt?alt.val:'';it.altOk=!!(alt&&alt.ok);
 }
-// Snapshot a wide area around the barcode, deskewed with the barcode's corners.
-// Region (in barcode widths, barcode's top-left = 0,0): x -6 .. +2.2, y -3.4 .. +0.1
-// GM / ACDelco labels: numbers above the barcode. Motorcraft: numbers up and far left.
-const RX0=-6,RX1=2.2,RY0=-3.4,RY1=0.1,SNAPW=240;
-function snap(b){
-  const v=$('vid');const p=b.cornerPoints,bb=b.boundingBox;
+
+// ---------- finding the text lines (fast, no OCR) ----------
+// Adaptive threshold + connected components, then chars are chained into lines.
+// Returns lines sorted biggest text first: [{x0,y0,x1,y1,h,n}] in the canvas' pixels.
+function findLines(c,bw,max){
+  const W=c.width,H=c.height,N=W*H;
+  const d=c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data;
+  const g=new Uint8Array(N);for(let i=0,j=0;i<N;i++,j+=4)g[i]=(d[j]*77+d[j+1]*150+d[j+2]*29)>>8;
+  const W1=W+1,I=new Uint32Array(W1*(H+1));
+  for(let y=0;y<H;y++){let s=0;const r=y*W,o=(y+1)*W1,p=y*W1;for(let x=0;x<W;x++){s+=g[r+x];I[o+x+1]=I[p+x+1]+s}}
+  const R=Math.max(6,Math.round(bw*.11)),bin=new Uint8Array(N);
+  for(let y=0;y<H;y++){const y0=Math.max(0,y-R),y1=Math.min(H,y+R+1);for(let x=0;x<W;x++){const x0=Math.max(0,x-R),x1=Math.min(W,x+R+1);
+    const sum=I[y1*W1+x1]-I[y0*W1+x1]-I[y1*W1+x0]+I[y0*W1+x0];const n=(x1-x0)*(y1-y0);if(g[y*W+x]*n*100<sum*82)bin[y*W+x]=1}}
+  // connected components (4-neighbour, union-find)
+  const lab=new Int32Array(N),par=[0];const find=a=>{while(par[a]!==a){par[a]=par[par[a]];a=par[a]}return a};
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!bin[i])continue;const l=x?lab[i-1]:0,u=y?lab[i-W]:0;
+    if(l&&u){const a=find(l),b=find(u);lab[i]=a;if(a!==b)par[Math.max(a,b)]=Math.min(a,b)}else if(l||u)lab[i]=l||u;else{par.push(par.length);lab[i]=par.length-1}}
+  const st=new Map();
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!lab[i])continue;const r=find(lab[i]);let s=st.get(r);if(!s){s={x0:x,x1:x,y0:y,y1:y,n:0};st.set(r,s)}s.n++;if(x<s.x0)s.x0=x;if(x>s.x1)s.x1=x;if(y<s.y0)s.y0=y;if(y>s.y1)s.y1=y}
+  const hmin=Math.max(7,bw*.04),hmax=bw*.34,ch=[];
+  for(const s of st.values()){const w=s.x1-s.x0+1,h=s.y1-s.y0+1;if(h<hmin||h>hmax||w>h*1.5||s.n<w*h*.12)continue;if(s.x0===0||s.y0===0||s.x1===W-1||s.y1===H-1)continue;s.h=h;ch.push(s)}
+  ch.sort((a,b)=>a.x0-b.x0);
+  const lines=[];
+  for(const s of ch){let best=null,bg=1e9;
+    for(const L of lines){const hm=Math.max(L.h,s.h),gap=s.x0-L.x1;if(gap>1.3*Math.max(L.hl,s.h)||gap<-.3*L.hl)continue;
+      const r=s.h/L.hl;if(r<.4||r>2.5)continue;
+      if(Math.abs(s.y1-L.yb)>.28*hm&&Math.abs((s.y0+s.y1)/2-L.cy)>.3*hm)continue;
+      if(gap<bg){bg=gap;best=L}}
+    if(best){best.x1=Math.max(best.x1,s.x1);best.y0=Math.min(best.y0,s.y0);best.y1=Math.max(best.y1,s.y1);best.h=Math.max(best.h,s.h);best.hl=s.h;best.yb=s.y1;best.cy=(s.y0+s.y1)/2;best.n++}
+    else lines.push({x0:s.x0,x1:s.x1,y0:s.y0,y1:s.y1,h:s.h,hl:s.h,yb:s.y1,cy:(s.y0+s.y1)/2,n:1})}
+  return lines.filter(L=>L.n>=3&&L.x1-L.x0>L.h*2).sort((a,b)=>b.h-a.h).slice(0,max||7);
+}
+// crop one line out of the hi-res picture, scaled so its text is th px tall
+function lineCanvas(src,L,k,th){
+  const h=L.h/k,pad=h*.4,x=L.x0/k-pad,y=L.y0/k-pad,w=(L.x1-L.x0)/k+2*pad,hh=(L.y1-L.y0)/k+2*pad,s=th/h;
+  const c=document.createElement('canvas');c.width=Math.max(8,Math.round(w*s));c.height=Math.max(8,Math.round(hh*s));
+  const x2=c.getContext('2d');x2.fillStyle='#fff';x2.fillRect(0,0,c.width,c.height);x2.imageSmoothingQuality='high';x2.drawImage(src,x,y,w,hh,0,0,c.width,c.height);return c}
+function rot90(src,dir){const c=document.createElement('canvas');c.width=src.height;c.height=src.width;const x=c.getContext('2d');x.translate(c.width/2,c.height/2);x.rotate(dir*Math.PI/2);x.drawImage(src,-src.width/2,-src.height/2);return c}
+function scaled(src,k){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(src.width*k));c.height=Math.max(1,Math.round(src.height*k));c.getContext('2d').drawImage(src,0,0,c.width,c.height);return c}
+
+// ---------- OCR pool: several readers working at once ----------
+const NW=Math.max(2,Math.min(3,(navigator.hardwareConcurrency||4)>>1));
+const pool=[];const q=[];let ready=false;
+const WL='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#-.: ';
+function ocr(canvas,psm,prio){return new Promise(res=>{const j={canvas,psm,res,prio:prio||0};let i=q.length;while(i>0&&q[i-1].prio<j.prio)i--;q.splice(i,0,j);drain()})}
+function drain(){for(const w of pool){if(w.busy||!q.length)continue;const j=q.shift();w.busy=true;(async()=>{let t='';try{if(w.psm!==j.psm){await w.w.setParameters({tessedit_pageseg_mode:j.psm,tessedit_char_whitelist:j.psm==='7'?WL:''});w.psm=j.psm}const r=await w.w.recognize(j.canvas);t=r.data.text||''}catch(e){}w.busy=false;j.res(t);drain()})()}}
+(async()=>{
+  try{const ws=await Promise.all(Array.from({length:NW},()=>Tesseract.createWorker('eng',1)));for(const w of ws){await w.setParameters({tessedit_pageseg_mode:'7',tessedit_char_whitelist:WL});pool.push({w,psm:'7',busy:false})}ready=true;if(stream&&!paused)$('hud').textContent='Point at a label: barcode and numbers in view';drain();pump()}
+  catch(e){if(stream)$('hud').textContent='Text reader failed to load. UPCs still save; type the numbers or Capture.'}
+})();
+
+// ---------- snapshots around a barcode ----------
+// Region in barcode widths (barcode's top-left = 0,0). GM/ACDelco: numbers above the
+// barcode. Motorcraft: numbers up and far left. The snapshot is deskewed with the barcode.
+const RX0=-6,RX1=2.2,RY0=-3.4,RY1=0.95;
+function snap(src,b,perBw){
+  const p=b.cornerPoints,bb=b.boundingBox;
   let ang=0,bw=bb.width,x0=bb.x,y0=bb.y;
   if(p&&p.length===4){ang=Math.atan2(p[1].y-p[0].y,p[1].x-p[0].x);bw=Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);x0=p[0].x;y0=p[0].y}
-  if(bw<110)return 'far'; // too small to read the printed numbers
-  const s=Math.min(3,SNAPW/bw);
+  if(bw<95)return 'far';
+  const s=Math.min(3,perBw/bw);
   const c=document.createElement('canvas');c.width=Math.round((RX1-RX0)*bw*s);c.height=Math.round((RY1-RY0)*bw*s);
-  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.filter='grayscale(1)';
-  x.translate(-RX0*bw*s,-RY0*bw*s);x.scale(s,s);x.rotate(-ang);x.translate(-x0,-y0);x.drawImage(v,0,0);
-  c.bw=bw*s;return c;
+  const x=c.getContext('2d',{willReadFrequently:true});x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.filter='grayscale(1)';
+  x.translate(-RX0*bw*s,-RY0*bw*s);x.scale(s,s);x.rotate(-ang);x.translate(-x0,-y0);x.drawImage(src,0,0);
+  let bh=p&&p.length===4?Math.hypot(p[3].x-p[0].x,p[3].y-p[0].y):(bb.height||bw*.3);bh=Math.min(Math.max(bh,bw*.15),bw*.6);
+  x.setTransform(1,0,0,1,0,0);x.filter='none';x.fillStyle='#fff';x.fillRect((-RX0-.03)*bw*s,(-RY0-.03)*bw*s,1.06*bw*s,bh*s+.06*bw*s);
+  c.bw=bw*s;c.srcBw=bw;return c;
 }
-// Each snapshot is read several ways: [region, barcode width in px]. A = near the barcode
-// (GM/ACDelco), B = the wide area (Motorcraft and anything else).
-const A=[-2.3,1.9,-1.9,0.05],B=[RX0,1.0,-3.2,0.1];
-const JOBS=[[A,285],[A,200],[B,230],[A,250],[B,195],[A,320],[B,265],[A,220]];
-const work=document.createElement('canvas'),wx=work.getContext('2d',{willReadFrequently:true});
-function region(c,j){const [r,w]=JOBS[j];const bw=c.bw,s=w/bw;const sx=(r[0]-RX0)*bw,sy=(r[2]-RY0)*bw,sw=(r[1]-r[0])*bw,sh=(r[3]-r[2])*bw;
-  work.width=Math.round(sw*s);work.height=Math.round(sh*s);wx.fillStyle='#fff';wx.fillRect(0,0,work.width,work.height);wx.drawImage(c,sx,sy,sw,sh,0,0,work.width,work.height);return work}
-const snaps={}; // upc -> [{c,tried}]
-let ocrBusy=false,inView='';
-function nextSnap(it){const ss=snaps[it.upc];if(!ss||!ss.length)return null;const s=ss.reduce((m,x)=>x.tried<m.tried?x:m,ss[0]);return s.tried<JOBS.length?s:null}
-function pickJob(){
-  const cand=items.filter(i=>!i.manual&&!i.ok&&snaps[i.upc]);
-  cand.sort((a,b)=>(b.upc===inView)-(a.upc===inView));
-  for(const it of cand){const s=nextSnap(it);if(s)return{it,s}}
-  for(const it of items){if(it.ok&&!it.altOk&&!it.manual&&snaps[it.upc]){const s=nextSnap(it);if(s)return{it,s}}}
-  return null;
+// Read a picture: find its text lines, OCR each line at two sizes (two independent votes).
+// deep=true (Capture): three sizes plus a full-page pass.
+// Chrome's own text reader (Google's, on Android) when the experimental flag is on.
+let TD=null;
+(async()=>{try{if(!('TextDetector' in window))return;const t=new TextDetector();const c=document.createElement('canvas');c.width=320;c.height=80;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,320,80);x.fillStyle='#000';x.font='bold 44px Arial';x.fillText('GM# 1234',10,58);
+  const r=await t.detect(c);if(r&&r.length&&r.some(z=>z.rawValue&&/\d{3}/.test(z.rawValue))){TD=t;const el=$('sup');if(el)el.textContent='⚡ Fast Google text reader is on.'}}catch(e){}})();
+async function tdRead(c){try{const r=await TD.detect(c);const ls=r.filter(z=>z.rawValue).map(z=>({t:z.rawValue,y:z.boundingBox.y,x:z.boundingBox.x,h:z.boundingBox.height}));ls.sort((a,b)=>Math.abs(a.y-b.y)<a.h*.5?a.x-b.x:a.y-b.y);return parseText(ls.map(z=>z.t).join('\n'))}catch(e){return {}}}
+async function readPic(c,bw,prio,deep){
+  const tdp=TD?tdRead(c):null;
+  const k=Math.min(1,150/bw),small=k<1?scaled(c,k):c;
+  const L=findLines(small,bw*k,deep?10:7).sort((a,b)=>a.y0-b.y0||a.x0-b.x0);
+  const sizes=deep?[40,54,32]:[40,54];const out=[];
+  for(const th of sizes){
+    const texts=await Promise.all(L.map(l=>ocr(lineCanvas(c,l,k,th),'7',prio)));
+    out.push(parseText(texts.join('\n')));
+  }
+  if(tdp)out.push(await tdp);
+  if(deep||!L.length){ // full-page pass catches anything the line finder missed
+    const k2=Math.min(1.6,230/bw);const t=await ocr(scaled(c,k2),'11',prio);out.push(parseText(t));
+  }
+  return out;
 }
-async function pump(){
-  if(ocrBusy||!worker)return;const job=pickJob();if(!job)return;
-  ocrBusy=true;
-  try{const r=await worker.recognize(region(job.s.c,job.s.tried++));vote(job.it,parseText(r.data.text||''))}catch(e){}
-  ocrBusy=false;
-  const it=job.it,ss=snaps[it.upc]||[];const done=ss.length>=2&&ss.every(s=>s.tried>=JOBS.length);
-  if(!it.ok&&done&&it.upc!==inView&&!it.gaveUp){it.gaveUp=true;save();render()}
-  if((it.ok&&(it.altOk||done))||it.gaveUp)delete snaps[it.upc]; // free memory
-  setTimeout(pump,0);
-}
-function vote(it,got){
+
+// ---------- items ----------
+const snaps={}; // id -> {pics:[canvas],read:n,last}
+let inView='',lastHit=0;
+function newItem(o){const it=Object.assign({id:o.upc||('p'+Date.now()+Math.floor(Math.random()*1e3)),at:Date.now(),lot:lot||''},o);items.unshift(it);save();return it}
+function label(it){return(it.brand?it.brand+' ':'')+it.part+(it.alt?'  ('+it.alt+')':'')}
+function vote(it,got,w){
   it.v=it.v||{};let any=false;
-  for(const f of FIELDS)if(got[f]){any=true;const o=it.v[f]=it.v[f]||{};o[got[f]]=(o[got[f]]||0)+1}
+  for(const f of FIELDS)if(got[f]){any=true;const o=it.v[f]=it.v[f]||{};o[got[f]]=(o[got[f]]||0)+(w||1)}
   if(!any||it.manual)return;
   const was=it.part||'',hadOk=!!it.ok;
-  derive(it);it.sent=false;save();
-  const label=()=>(it.brand?it.brand+' ':'')+it.part+(it.alt?'  ('+it.alt+')':'');
-  if(!hadOk&&it.ok){delete it.gaveUp;beep(S.hit);navigator.vibrate&&navigator.vibrate(40);if(it.upc===inView||Date.now()-lastHit>1500)$('hud').textContent='✓ '+label();lastHit=Date.now();render(it.upc);dropThumb(it.upc)}
-  else if(!it.ok&&it.part){if(it.upc===inView)$('hud').textContent=label()+'? checking…';if(was!==it.part)render()}
-  else render();
+  derive(it);if(it.part!==was||it.ok!==hadOk)it.sent=false;save();
+  if(!hadOk&&it.ok){delete it.gaveUp;beep(S.hit);navigator.vibrate&&navigator.vibrate(40);if(it.id===inView||Date.now()-lastHit>1500)$('hud').textContent='✓ '+label(it);lastHit=Date.now();render(it.id)}
+  else if(!it.ok&&it.part){if(it.id===inView)$('hud').textContent=label(it)+'? checking…';if(was!==it.part)render()}
 }
-let lastHit=0;
+let pumping=0;
+function pump(){
+  if(!ready||pumping>=NW)return; // one snapshot per reader at a time
+  const cand=Object.keys(snaps).map(id=>items.find(i=>i.id===id)).filter(it=>it&&!it.manual&&(!it.ok||!it.altOk)&&snaps[it.id].pics.length>snaps[it.id].read);
+  if(!cand.length)return;
+  cand.sort((a,b)=>(b.id===inView)-(a.id===inView)||(!!a.ok)-(!!b.ok));
+  const it=cand[0],sn=snaps[it.id],c=sn.pics[sn.read++];pumping++;
+  readPic(c,c.bw,it.id===inView?2:1,false).then(rs=>{
+    const w=c.srcBw<140?.5:1; // small in the frame: weaker votes, wait for more agreement
+    for(const r of rs)vote(it,r,w);
+    if(!it.ok&&c.srcBw<140&&it.id===inView)$('hud').textContent=(it.part?label(it)+'? ':'')+'closer reads faster';
+    pumping--;
+    const done=sn.read>=3&&sn.read>=sn.pics.length;
+    if(!it.ok&&done&&it.id!==inView&&!it.gaveUp){it.gaveUp=true;save();render()}
+    if(it.ok&&(it.altOk||done))delete snaps[it.id];
+    pump();
+  });
+  pump();
+}
 // ---------- saved pictures (for typing the number later) ----------
 let idb=null;try{const r=indexedDB.open('lc',1);r.onupgradeneeded=()=>r.result.createObjectStore('t');r.onsuccess=()=>{idb=r.result;render()}}catch(e){}
 const thumbs={};
-function putThumb(upc,c){try{const d=c.toDataURL('image/jpeg',.6);thumbs[upc]=d;idb&&idb.transaction('t','readwrite').objectStore('t').put(d,upc)}catch(e){}}
-function dropThumb(upc){delete thumbs[upc];try{idb&&idb.transaction('t','readwrite').objectStore('t').delete(upc)}catch(e){}}
-function getThumb(upc){return new Promise(res=>{if(thumbs[upc])return res(thumbs[upc]);if(!idb)return res(null);try{const q=idb.transaction('t').objectStore('t').get(upc);q.onsuccess=()=>{if(q.result)thumbs[upc]=q.result;res(q.result||null)};q.onerror=()=>res(null)}catch(e){res(null)}})}
-// ---------- loop ----------
-const seen={}; // upc -> last time in view
+function putThumb(id,c){try{const d=c.toDataURL('image/jpeg',.7);thumbs[id]=d;idb&&idb.transaction('t','readwrite').objectStore('t').put(d,id)}catch(e){}}
+function dropThumb(id){delete thumbs[id];try{idb&&idb.transaction('t','readwrite').objectStore('t').delete(id)}catch(e){}}
+function getThumb(id){return new Promise(res=>{if(thumbs[id])return res(thumbs[id]);if(!idb)return res(null);try{const q=idb.transaction('t').objectStore('t').get(id);q.onsuccess=()=>{if(q.result)thumbs[id]=q.result;res(q.result||null)};q.onerror=()=>res(null)}catch(e){res(null)}})}
+// ---------- live loop ----------
+const seen={};
+function onPartCode(pc,upcInFrame,now){
+  // a part number printed as a barcode is exact: no reading needed
+  let it=upcInFrame?items.find(i=>i.id===upcInFrame):items.find(i=>!i.upc&&i.part===pc.part&&(i.lot||'')===(lot||''));
+  if(!it&&upcInFrame)return;
+  if(!it){it=newItem({upc:'',part:pc.part,brand:pc.brand,ok:true,altOk:true,src:'code'});beep(S.hit);navigator.vibrate&&navigator.vibrate(40);$('hud').textContent='✓ '+label(it)+' (barcode)';render(it.id);return}
+  if(it.manual||(it.ok&&it.part===pc.part))return;
+  it.v=it.v||{};const f=pc.brand==='Mopar'?'mopar':pc.brand==='Motorcraft'?'mc':'ford';const o=it.v[f]=it.v[f]||{};o[pc.part]=(o[pc.part]||0)+5;
+  const had=it.ok;derive(it);it.sent=false;save();if(!had&&it.ok){beep(S.hit);$('hud').textContent='✓ '+label(it);render(it.id)}
+}
 async function tick(){
   if(!stream)return;
   if(!paused&&det&&!busy){
     busy=true;
     try{
       const codes=await det.detect($('vid'));
-      const now=Date.now();let any=false;
+      const now=Date.now();let any=false,upcHere='';const parts=[];
       for(const b of codes){
-        const c=normUpc(b.rawValue);if(!c)continue;any=true;inView=c;
-        let it=items.find(i=>i.upc===c);
-        if(!it){it={upc:c,at:now};items.unshift(it);save();render(c);beep(S.seen);navigator.vibrate&&navigator.vibrate(15);$('hud').textContent='UPC '+c+' · reading…'}
-        else if(!seen[c]||now-seen[c]>3000){beep(S.seen);$('hud').textContent=it.ok||it.manual?'Have '+c+' → '+(it.brand?it.brand+' ':'')+it.part:'UPC '+c+' · reading…'}
+        const c=normUpc(b.rawValue);
+        if(!c){const pc=codePart(b.rawValue);if(pc){parts.push(pc);any=true}continue}
+        any=true;inView=c;upcHere=c;
+        let it=items.find(i=>i.id===c);
+        if(!it){it=newItem({upc:c});render(c);beep(S.seen);navigator.vibrate&&navigator.vibrate(15);$('hud').textContent='UPC '+c+' · reading…'}
+        else if(!seen[c]||now-seen[c]>3000){beep(S.seen);$('hud').textContent=it.ok||it.manual?'Have '+c+' → '+label(it):'UPC '+c+' · reading…'}
         seen[c]=now;
-        if(!it.manual&&!it.ok){
-          const ss=snaps[c]=snaps[c]||[];
-          if(ss.length<3&&(!ss.last||now-ss.last>350)){const sc=snap(b);if(sc==='far'){if(!it.part)$('hud').textContent='UPC '+c+' · move closer so the numbers are bigger'}else if(sc){ss.push({c:sc,tried:0});ss.last=now;if(ss.length===1)putThumb(c,sc);if(it.gaveUp){delete it.gaveUp;render()}}}
-          const ks=Object.keys(snaps);if(ks.length>10)for(const k of ks.slice(0,ks.length-10))if(k!==c)delete snaps[k];
+        if(!it.manual&&(!it.ok||!it.altOk)){
+          const sn=snaps[c]=snaps[c]||{pics:[],read:0,last:0};
+          if(sn.pics.length<4&&now-sn.last>300){const sc=snap($('vid'),b,230);
+            if(sc==='far'){if(!it.part)$('hud').textContent='UPC '+c+' · move closer so the numbers are bigger'}
+            else{sn.pics.push(sc);sn.last=now;if(sn.pics.length===1)putThumb(c,sc);if(it.gaveUp){delete it.gaveUp;render()}}}
+          const ks=Object.keys(snaps);if(ks.length>8)for(const k of ks.slice(0,ks.length-8))if(k!==c)delete snaps[k];
           pump();
         }
       }
-      if(!any)inView='';
+      for(const pc of parts)onPartCode(pc,upcHere,now);
+      if(!upcHere)inView='';
       $('frame').classList.toggle('hit',any);
-      if(!any&&now-Math.max(0,...Object.values(seen))>2500)$('hud').textContent=worker?'Point at a label: barcode and numbers in view':'Loading text reader…';
+      if(!any&&now-Math.max(0,...Object.values(seen))>2500&&!capBusy)$('hud').textContent=ready?'Point at a label, or tap Capture':'Loading text reader…';
     }catch(e){$('hud').textContent='Camera error: '+(e.message||e)}
     busy=false;
   }
-  setTimeout(tick,120);
+  setTimeout(tick,70);
 }
-// text reader loads as soon as the page opens, not when the camera starts
-(async()=>{
-  try{worker=await Tesseract.createWorker('eng');await worker.setParameters({tessedit_pageseg_mode:'11'});if(stream)$('hud').textContent='Point at a label: barcode and numbers in view';pump()}
-  catch(e){worker=null;if(stream)$('hud').textContent='Text reader failed to load. UPCs still save; type the numbers.'}
-})();
+// ---------- Capture: full-resolution still, read slowly and carefully ----------
+let capBusy=0;
+async function grabStill(){
+  if(imgCap){try{const blob=await Promise.race([imgCap.takePhoto(),new Promise((_,r)=>setTimeout(()=>r('t'),4000))]);return await createImageBitmap(blob)}catch(e){}}
+  const v=$('vid');const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);return c;
+}
+async function capture(){
+  if(!stream)return;
+  const fl=$('flash');fl.classList.add('on');setTimeout(()=>fl.classList.remove('on'),60);beep(S.shut);navigator.vibrate&&navigator.vibrate(25);
+  capBusy++;$('cap').classList.add('busy');$('hud').textContent='📸 Photo taken · keep scanning, reading it now…';
+  const capLot=lot||'',t0cap=Date.now();
+  try{
+    const img=window.__lcTestImg||await grabStill();
+    let codes=[];try{codes=await det.detect(img)}catch(e){}
+    const upcs=[],parts=[];
+    for(const b of codes){const c=normUpc(b.rawValue);if(c){if(!upcs.find(u=>u.c===c))upcs.push({c,b})}else{const pc=codePart(b.rawValue);if(pc)parts.push(pc)}}
+    let found=0;
+    if(upcs.length){
+      for(const {c,b} of upcs){
+        let it=items.find(i=>i.id===c);if(!it){it=newItem({upc:c,lot:capLot});render(c)}
+        if(parts.length===1&&upcs.length===1){onPartCode(parts[0],c,Date.now())}
+        if(it.manual||(it.ok&&it.altOk))continue;
+        const sc=snap(img,b,320);
+        const pic=sc==='far'?snapLoose(img,b):sc;putThumb(c,pic);
+        const rs=await readPic(pic,pic.bw,3,true);
+        for(const r of rs)vote(it,r);
+        if(it.part)found++;
+        if(!it.ok&&it.part){it.capNote=1}
+        if(!it.part){it.gaveUp=true}save();render(it.id);
+      }
+    }else{
+      // no barcode in the photo: read the whole picture
+      const W=img.width,k=Math.min(1,1800/W);const pic=scaled(img,k);
+      const it=parts.length?null:newItem({upc:'',lot:capLot,src:'photo'});
+      if(parts.length){for(const pc of parts)onPartCode(pc,'',Date.now());found=parts.length}
+      else{
+        putThumb(it.id,scaled(pic,Math.min(1,1000/pic.width)));render(it.id);
+        let rs=await readPic(pic,pic.width/9,3,true);
+        // nothing? the label may be sideways: try it turned both ways
+        for(const dir of [1,-1]){if(rs.some(r=>Object.keys(r).length))break;rs=await readPic(rot90(pic,dir),pic.width/9,3,true)}
+        for(const r of rs)vote(it,r);
+        if(it.part){found++;if(!it.ok){it.ok=true;it.capNote=1}}else it.gaveUp=true;
+        save();render(it.id);
+      }
+    }
+    const got=items.filter(i=>i.at>=t0cap||upcs.find(u=>u.c===i.id)).filter(i=>i.part);
+    if(found&&got.length){beep(S.hit);$('hud').textContent='📸 ✓ '+got.slice(0,2).map(label).join(' · ')+(got.some(i=>i.capNote)?'  (check it)':'')}
+    else{beep(S.need);$('hud').textContent='📸 Couldn\'t read that photo. It\'s saved: tap 📷 in the list to type it.'}
+  }catch(e){$('hud').textContent='Capture failed: '+(e.message||e)}
+  capBusy--;if(!capBusy)$('cap').classList.remove('busy');
+}
+function snapLoose(img,b){const bw=Math.max(95,b.boundingBox.width);const bb={x:b.boundingBox.x,y:b.boundingBox.y,width:bw};return snap(img,{boundingBox:bb,cornerPoints:null},Math.max(320,bw))}
+$('cap').onclick=capture;
 // ---------- UI ----------
-const BRANDS=['GM','ACDelco','Ford','Motorcraft','Mopar',''];
 function guessBrand(p){p=(p||'').toUpperCase();if(/^\d{8}$/.test(p))return 'GM';if(/^\d{8}A[A-Z]$/.test(p))return 'Mopar';if(FORD_RE.test(p.replace(/-/g,' ')))return 'Ford';if(ACD_RE.test(p))return 'ACDelco';if(/^[A-Z]{2,4}-\d/.test(p))return 'Motorcraft';return ''}
-function setManual(it,part,alt){part=(part||'').trim().toUpperCase();alt=(alt||'').trim().toUpperCase();if(!part&&!alt)return false;it.manual=true;it.part=part||alt;it.alt=part?alt:'';it.altOk=true;it.ok=true;it.brand=guessBrand(it.part);delete it.gaveUp;it.sent=false;save();dropThumb(it.upc);return true}
+function setManual(it,part,alt){part=(part||'').trim().toUpperCase();alt=(alt||'').trim().toUpperCase();if(!part&&!alt)return false;it.manual=true;it.part=part||alt;it.alt=part?alt:'';it.altOk=true;it.ok=true;it.brand=guessBrand(it.part);delete it.gaveUp;it.sent=false;save();dropThumb(it.id);delete snaps[it.id];return true}
 function render(flash){
   const ae=document.activeElement;if(ae&&ae.closest&&ae.closest('#list')&&ae.tagName==='INPUT'){clearTimeout(render.t);render.t=setTimeout(()=>render(flash),800);return}
   const un=items.filter(i=>!i.sent&&i.part).length;
   $('cnt').textContent=items.length+' total · '+un+' not sent';
   $('send').textContent=un?'Send '+un+' to scanner':'Send to scanner';
   $('list').innerHTML=items.map((i,n)=>{
-    const st=i.ok||i.manual?'':(i.gaveUp?' <span class="st bad">couldn\'t read · tap 📷</span>':(i.part?' <span class="st">checking…</span>':' <span class="st">reading…</span>'));
-    return '<div class="item'+(i.upc===flash?' new':'')+((!i.part||(!i.ok&&!i.manual))?' need':'')+'"><div><div class="upc">UPC '+esc(i.upc)+(i.brand?' · <b>'+esc(i.brand)+'</b>':'')+(i.sent?' <span class="sent">✓ sent</span>':'')+st+'</div><div class="pn"><input data-n="'+n+'" data-f="part" value="'+esc(i.part||'')+'" placeholder="Part #" autocapitalize="characters"><input class="acd" data-n="'+n+'" data-f="alt" value="'+esc(i.alt||'')+'" placeholder="2nd # (ACD / Motorcraft)" autocapitalize="characters"></div></div><div class="btns">'+(i.ok||i.manual?'':'<button data-pic="'+esc(i.upc)+'">📷</button>')+'<button data-del="'+n+'">✕</button></div></div>'}).join('')||'<div class="msg">Nothing yet. Start the camera and point it at a label.</div>';
+    const st=i.ok||i.manual?(i.capNote?' <span class="st">from photo, check it</span>':''):(i.gaveUp?' <span class="st bad">couldn\'t read · tap 📷</span>':(i.part?' <span class="st">checking…</span>':' <span class="st">reading…</span>'));
+    return '<div class="item'+(i.id===flash?' new':'')+((!i.part||(!i.ok&&!i.manual))?' need':'')+'"><div><div class="upc"><span class="lotc">Lot<input data-n="'+n+'" data-f="lot" inputmode="numeric" value="'+esc(i.lot||'')+'"></span> '+(i.upc?'UPC '+esc(i.upc):(i.src==='photo'?'photo':'barcode'))+(i.brand?' · <b>'+esc(i.brand)+'</b>':'')+(i.sent?' <span class="sent">✓ sent</span>':'')+st+'</div><div class="pn"><input data-n="'+n+'" data-f="part" value="'+esc(i.part||'')+'" placeholder="Part #" autocapitalize="characters"><input class="acd" data-n="'+n+'" data-f="alt" value="'+esc(i.alt||'')+'" placeholder="2nd # (ACD / Motorcraft)" autocapitalize="characters"></div></div><div class="btns">'+(i.ok&&!i.capNote||i.manual?'':'<button data-pic="'+esc(i.id)+'">📷</button>')+'<button data-del="'+n+'">✕</button></div></div>'}).join('')||'<div class="msg">Nothing yet. Type the lot, start the camera and point it at a label.</div>';
 }
-$('list').addEventListener('change',e=>{const i=e.target.closest('input');if(!i)return;const it=items[+i.dataset.n];if(!it)return;const row=i.closest('.item');setManual(it,row.querySelector('[data-f=part]').value,row.querySelector('[data-f=alt]').value)||(it.part='');render()});
-$('list').addEventListener('click',e=>{const pb=e.target.closest('[data-pic]');if(pb){showPic(pb.dataset.pic);return}const b=e.target.closest('[data-del]');if(!b)return;const it=items[+b.dataset.del];dropThumb(it.upc);delete snaps[it.upc];items.splice(+b.dataset.del,1);save();render()});
-async function showPic(upc){
-  const it=items.find(i=>i.upc===upc);if(!it)return;const d=await getThumb(upc);
-  const o=document.createElement('div');o.className='pic';
-  o.innerHTML='<div class="upc">UPC '+esc(upc)+'</div>'+(d?'<img alt="">':'<div class="msg">No picture saved for this one.</div>')+'<div class="pn"><input id="pgm" placeholder="Part #" autocapitalize="characters"><input id="pacd" class="acd" placeholder="2nd # (optional)" autocapitalize="characters"></div><div class="row"><button class="pri" id="psave">Save</button><button id="pclose">Close</button></div>';
+$('list').addEventListener('change',e=>{const i=e.target.closest('input');if(!i)return;const it=items[+i.dataset.n];if(!it)return;
+  if(i.dataset.f==='lot'){it.lot=i.value.replace(/\D/g,'');it.sent=false;save();render();return}
+  const row=i.closest('.item');if(!setManual(it,row.querySelector('[data-f=part]').value,row.querySelector('[data-f=alt]').value))it.part='';delete it.capNote;save();render()});
+$('list').addEventListener('click',e=>{const pb=e.target.closest('[data-pic]');if(pb){showPic(pb.dataset.pic);return}const b=e.target.closest('[data-del]');if(!b)return;const it=items[+b.dataset.del];dropThumb(it.id);delete snaps[it.id];items.splice(+b.dataset.del,1);save();render()});
+async function showPic(id){
+  const it=items.find(i=>i.id===id);if(!it)return;const d=await getThumb(id);
+  const o=document.createElement('div');o.className='sheet';
+  o.innerHTML='<div class="upc">'+(it.upc?'UPC '+esc(it.upc):'Photo')+' · Lot '+esc(it.lot||'—')+'</div>'+(d?'<img alt="">':'<div class="msg">No picture saved for this one.</div>')+'<div class="pn"><input id="pgm" placeholder="Part #" autocapitalize="characters"><input id="pacd" class="acd" placeholder="2nd # (optional)" autocapitalize="characters"></div><div class="row"><button class="pri" id="psave">Save</button><button id="pclose">Close</button></div>';
   if(d)o.querySelector('img').src=d;
   o.querySelector('#pgm').value=it.part||'';o.querySelector('#pacd').value=it.alt||'';
   document.body.appendChild(o);const was=paused;paused=true;
   const close=()=>{o.remove();paused=was};
   o.querySelector('#pclose').onclick=close;
-  o.querySelector('#psave').onclick=()=>{if(setManual(it,o.querySelector('#pgm').value,o.querySelector('#pacd').value))beep(S.hit);close();render()};
+  o.querySelector('#psave').onclick=()=>{if(setManual(it,o.querySelector('#pgm').value,o.querySelector('#pacd').value)){delete it.capNote;save();beep(S.hit)}close();render()};
 }
+// ---------- lot ----------
+function setLot(v,quiet){lot=String(v||'').replace(/\D/g,'').slice(0,6);LS.set('lot',lot);if($('lot').value!==lot)$('lot').value=lot;if(!quiet&&lot){toast('Lot '+lot+': new labels go to this lot')}}
+$('lot').value=lot;
+$('lot').addEventListener('input',()=>setLot($('lot').value,true));
+$('lot').addEventListener('change',()=>setLot($('lot').value));
+$('lot').addEventListener('keydown',e=>{if(e.key==='Enter')$('lot').blur()});
+$('lotup').onclick=()=>{setLot(String((+lot||0)+1));beep(S.seen)};
+$('lotdn').onclick=()=>{if(+lot>1){setLot(String(+lot-1));beep(S.seen)}};
+// ---------- send ----------
 const BCODE={GM:'GM',ACDelco:'ACD',Ford:'FORD',Motorcraft:'FORD',Mopar:'OTH'};
-function payload(all){return items.filter(i=>(all||!i.sent)&&i.part).map(i=>[i.upc,i.part,BCODE[i.brand]||'',i.alt&&(i.altOk||i.manual)?i.alt:''].join(':')).join(',')}
-$('send').onclick=async()=>{const p=payload(false);if(!p){toast('Nothing new to send.',true);return}
+// entry: upc:part:brand:alt:lot  (upc may be empty for photo / part-barcode items)
+function payload(all){return items.filter(i=>(all||!i.sent)&&i.part).map(i=>[i.upc||'',i.part,BCODE[i.brand]||'',i.alt&&(i.altOk||i.manual)?i.alt:'',i.lot||''].join(':')).join(',')}
+async function doSend(){const p=payload(false);if(!p){toast('Nothing new to send.',true);return}
   let ok=false;try{await navigator.clipboard.writeText('LEARN '+p);ok=true}catch(e){}
   if(!ok){try{const ta=document.createElement('textarea');ta.value='LEARN '+p;document.body.appendChild(ta);ta.select();ok=document.execCommand('copy');ta.remove()}catch(e){}}
   if(!ok){toast('Couldn\'t copy. Try again.',true);return}
-  beep(S.send);const n=items.filter(i=>!i.sent&&i.part).length;items.forEach(i=>{if(i.part)i.sent=true});save();render();
-  $('msg').innerHTML='<b>Copied '+n+'.</b> Now in the Iowa scanner tap <b>📥</b> (top row, next to 🖼). If it asks, long-press the box, Paste, Import.';
-  toast('Copied '+n+'. In the scanner tap 📥');
-  setTimeout(()=>window.open(SCANNER,'_blank'),600)};
+  beep(S.send);const sel=items.filter(i=>!i.sent&&i.part);const lots=[...new Set(sel.map(i=>i.lot).filter(Boolean))];items.forEach(i=>{if(i.part)i.sent=true});save();render();
+  $('msg').innerHTML='<b>Copied '+sel.length+(lots.length?' for lot '+esc(lots.join(', ')):'')+'.</b> Now in the Iowa scanner tap <b>📥</b> (top row, next to 🖼). If it asks, long-press the box, Paste, Import.';
+  toast('Copied '+sel.length+'. In the scanner tap 📥');
+  setTimeout(()=>window.open(SCANNER,'_blank'),600)}
+$('send').onclick=()=>{
+  const sel=items.filter(i=>!i.sent&&i.part);if(!sel.length){toast('Nothing new to send.',true);return}
+  const nolot=sel.filter(i=>!i.lot);
+  if(!nolot.length)return doSend();
+  // ask for the lot once, big and quick
+  const o=document.createElement('div');o.className='sheet';
+  o.innerHTML='<h3>'+(nolot.length===1?'Which lot is this label from?':'Which lot are these '+nolot.length+' labels from?')+'</h3><input class="bigin" id="slot" inputmode="numeric" autocomplete="off" placeholder="Lot #"><button class="pri" id="sgo">Send '+sel.length+' to scanner</button><button id="sno">Send without a lot</button><button id="sx">Cancel</button>';
+  document.body.appendChild(o);const inp=o.querySelector('#slot');inp.value=lot||'';setTimeout(()=>{inp.focus();inp.select()},50);
+  const go=v=>{v=String(v||'').replace(/\D/g,'');if(v){nolot.forEach(i=>i.lot=v);setLot(v,true);save()}o.remove();doSend()};
+  o.querySelector('#sgo').onclick=()=>go(inp.value);inp.addEventListener('keydown',e=>{if(e.key==='Enter')go(inp.value)});
+  o.querySelector('#sno').onclick=()=>go('');o.querySelector('#sx').onclick=()=>o.remove();
+};
 $('copy').onclick=async()=>{const p=payload(true);try{await navigator.clipboard.writeText('LEARN '+p);toast('Copied. Paste it into the scanner\'s Import box.')}catch(e){toast('Copy blocked.',true)}};
 $('clear').onclick=()=>{items=items.filter(i=>!i.sent);save();render()};
 $('pause').onclick=()=>{paused=!paused;$('pause').classList.toggle('on',paused);$('pause').textContent=paused?'Resume':'Pause';$('hud').textContent=paused?'Paused':'Point at a label'};
 $('torch').onclick=async()=>{const on=!$('torch').classList.contains('on');try{await track.applyConstraints({advanced:[{torch:on}]});$('torch').classList.toggle('on',on)}catch(e){}};
-function stopCam(){try{stream&&stream.getTracks().forEach(t=>t.stop())}catch(e){}stream=null;track=null;$('vid').srcObject=null;try{wake&&wake.release()}catch(e){}wake=null;$('camv').hidden=true;$('startv').hidden=false;$('go').textContent='Start camera';$('torch').classList.remove('on');paused=false;$('pause').classList.remove('on');$('pause').textContent='Pause'}
+function stopCam(){try{stream&&stream.getTracks().forEach(t=>t.stop())}catch(e){}stream=null;track=null;imgCap=null;$('vid').srcObject=null;try{wake&&wake.release()}catch(e){}wake=null;$('camv').hidden=true;$('startv').hidden=false;$('go').textContent='Start camera';$('torch').classList.remove('on');paused=false;$('pause').classList.remove('on');$('pause').textContent='Pause'}
 $('stop').onclick=()=>{stopCam();toast('Camera off. Everything read so far is saved.')};
 $('go').onclick=async()=>{
   beep([[1,0,.01]]);
@@ -268,13 +456,16 @@ $('go').onclick=async()=>{
   track=stream.getVideoTracks()[0];
   try{await track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
   try{$('torch').hidden=!(track.getCapabilities&&track.getCapabilities().torch)}catch(e){}
+  try{if('ImageCapture' in window)imgCap=new ImageCapture(track)}catch(e){imgCap=null}
   $('vid').srcObject=stream;$('startv').hidden=true;$('camv').hidden=false;
   try{if('wakeLock' in navigator)wake=await navigator.wakeLock.request('screen')}catch(e){}
   tick();
-  $('hud').textContent=worker?'Point at a label: barcode and numbers in view':'Loading text reader (first time only)…';
+  $('hud').textContent=ready?'Point at a label, or tap Capture':'Loading text reader (first time only)…';
 };
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&stream&&!stream.active)stopCam()});
 render();
+// test hooks (harmless in normal use)
+window.__lc={findLines,readPic,snap,parseText,codePart,capture,items:()=>items,isReady:()=>ready,setDet:d=>{det=d},setStream:s=>{stream=s},scaled,rot90};
 })();
 </script>
 </body></html>

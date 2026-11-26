@@ -6,6 +6,7 @@
 <style>
 :root{--bg:#101114;--card:#1d1f24;--line:#2e3138;--ink:#f2f2f2;--mute:#9aa0aa;--ok:#3fbf73;--warn:#ffb347;--bad:#ef6b62;--blue:#4b74d6}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.4 system-ui,-apple-system,Roboto,sans-serif}
 .cam{position:relative;background:#000;aspect-ratio:4/3;max-height:58vh;width:100%;overflow:hidden}
 video{width:100%;height:100%;object-fit:cover;display:block}
@@ -30,6 +31,11 @@ button.on{background:#ffd60a;color:#000}
 .pn input.acd{font-size:15px;width:8em}
 .item button{min-height:40px;padding:6px 10px;font-size:14px}
 .sent{font-size:12px;color:var(--ok)}
+.st{font-size:12px;color:var(--warn)}.st.bad{color:var(--bad)}
+.btns{display:flex;gap:6px}
+.pic{position:fixed;inset:0;background:#0b0c0f;z-index:9;display:flex;flex-direction:column;gap:10px;padding:14px;overflow:auto}
+.pic img{width:100%;border-radius:10px;background:#fff}
+.pic .pn input{font-size:24px}
 h2{font-size:16px;margin:18px 0 4px;display:flex;align-items:center;gap:8px}
 h2 span{margin-left:auto;font-size:13px;color:var(--mute)}
 .msg{color:var(--mute);font-size:14px;margin-top:8px}
@@ -39,7 +45,7 @@ h2 span{margin-left:auto;font-size:13px;color:var(--mute)}
 </head><body>
 <div id="startv" class="start">
   <h1 style="margin:0;font-size:24px">Label Camera</h1>
-  <p>Point at a GM / ACDelco label. It grabs the UPC barcode, reads the GM# and ACD# printed on the label, beeps, and remembers it. Then tap <b>Send to scanner</b> to teach the Iowa scanner every UPC at once.</p>
+  <p>Point at a GM or ACDelco label. It grabs the UPC barcode right away, reads the GM# and ACD# in the background, and double-beeps when it's sure. If it can't read one, the picture is kept so you can type the number later. Then tap <b>Send to scanner</b> to teach the Iowa scanner every UPC at once.</p>
   <button class="pri" id="go">Start camera</button>
   <p id="sup"></p>
 </div>
@@ -56,7 +62,6 @@ h2 span{margin-left:auto;font-size:13px;color:var(--mute)}
   <div class="row" style="margin-top:16px"><button id="clear">Clear sent</button></div>
 </div>
 <div class="toast" id="toast"></div>
-<canvas id="cv" hidden></canvas>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <script>
 (()=>{
@@ -65,7 +70,7 @@ const $=id=>document.getElementById(id);
 const LS={get(k,d){try{const v=localStorage.getItem('lc_'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('lc_'+k,JSON.stringify(v))}catch(e){}}};
 let items=LS.get('items',[]); // {upc,gm,acd,other,at,sent,conf}
 const save=()=>LS.set('items',items);
-let stream=null,track=null,det=null,worker=null,paused=false,busy=false,lastUpc='',lastAt=0;
+let stream=null,track=null,det=null,worker=null,paused=false,busy=false;
 let ac=null;
 function beep(seq){try{ac=ac||new AudioContext();if(ac.state==='suspended')ac.resume();for(const[f,t,d]of seq){const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.connect(g);g.connect(ac.destination);const s=ac.currentTime+t;g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.35,s+.008);g.gain.exponentialRampToValueAtTime(.0001,s+d);o.start(s);o.stop(s+d+.03)}}catch(e){}}
 const S={hit:[[1319,0,.07],[1760,.075,.12]],seen:[[1175,0,.06]],need:[[330,0,.15],[247,.18,.2]],send:[[784,0,.08],[1047,.08,.08],[1319,.16,.14]]};
@@ -79,59 +84,68 @@ function parseText(t){
   let gm=null,acd=null,m;
   for(const L of lines){
     if(!gm&&(m=L.match(/G[MN]\s*[#:]?\s*([0-9OIL ]{8,10})/))){const d=m[1].replace(/O/g,'0').replace(/[IL]/g,'1').replace(/ /g,'');if(/^\d{8}$/.test(d))gm=d}
-    if(!acd&&(m=L.match(/A?[CO]?[DO0]\s*#\s*([A-Z0-9][A-Z0-9\- ]{2,16})/))){const v=m[1].replace(/ /g,'').replace(/-+$/,'');if(/\d/.test(v)&&v.length>=4)acd=v}
+    if(!acd&&(m=L.match(/A?[CO]?[DO0P]\s*#\s*([A-Z0-9][A-Z0-9\- ]{2,16})/))){const v=m[1].replace(/ /g,'').replace(/-+$/,'');if(/\d/.test(v)&&v.length>=4)acd=v}
   }
-  if(!gm){for(const L of lines){const c=L.replace(/ /g,'');if(/^[1-9]\d{7}$/.test(c)&&!/^7?07773/.test(c)){gm=c;break}}}
-  if(!gm){const c=(t.match(/\b[1-9]\d{7}\b/g)||[]).filter(x=>!/^7?07773/.test(x));if(c.length)gm=c[0]}
+  if(!gm){const c=(t.match(/(?<![\d.])[1-9]\d{7}(?![\d.])/g)||[]).filter(x=>!/^7?07773|^8?08709/.test(x));if(c.length)gm=c[0]}
+  if(!acd){const c=t.match(/(?<![\d.])\d{1,3}-\d{3,6}(?![\d.])/);if(c)acd=c[0]}
   return{gm,acd};
 }
-// Crop just the GM#/ACD# area: on GM labels it sits right above the barcode, same left edge.
-// Deskews using the barcode's corner points and scales so the text is a good size for OCR.
-const cv=$('cv'),cx=cv.getContext('2d',{willReadFrequently:true});
-const SCALES=[250,220,285];let scaleI=0;
-function cropFor(b,aligned){
+// Snapshot the area around the barcode (GM labels: numbers above it; ACDelco labels:
+// numbers up and to the left). Deskewed with the barcode corners, saved per UPC so it
+// can keep being read after the box is gone.
+const SNAPW=300; // barcode width in snapshot px
+function snap(b){
   const v=$('vid');const p=b.cornerPoints,bb=b.boundingBox;
   let ang=0,bw=bb.width,x0=bb.x,y0=bb.y;
-  if(!aligned&&p&&p.length===4){ang=Math.atan2(p[1].y-p[0].y,p[1].x-p[0].x);bw=Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);x0=p[0].x;y0=p[0].y}
-  if(bw<40)return null;
-  const s=Math.max(.5,Math.min(3,SCALES[scaleI++%SCALES.length]/bw));
-  cv.width=Math.round(1.7*bw*s);cv.height=Math.round(1.1*bw*s);
-  cx.setTransform(1,0,0,1,0,0);cx.filter='none';cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);
-  cx.filter='grayscale(1)';
-  cx.translate(.18*bw*s,1.25*bw*s);cx.scale(s,s);cx.rotate(-ang);cx.translate(-x0,-y0);
-  cx.drawImage(v,0,0);
-  cx.setTransform(1,0,0,1,0,0);
-  return cv;
+  if(p&&p.length===4){ang=Math.atan2(p[1].y-p[0].y,p[1].x-p[0].x);bw=Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);x0=p[0].x;y0=p[0].y}
+  if(bw<150)return 'far'; // too small to read the printed numbers reliably
+  const s=Math.min(3,SNAPW/bw);
+  const c=document.createElement('canvas');c.width=Math.round(4.2*bw*s);c.height=Math.round(1.95*bw*s);
+  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.filter='grayscale(1)';
+  x.translate(2.3*bw*s,1.9*bw*s);x.scale(s,s);x.rotate(-ang);x.translate(-x0,-y0);x.drawImage(v,0,0);
+  c.bw=bw*s;return c;
 }
-let ocrBusy=false;
-async function ocrCode(upc,b){
-  if(ocrBusy||!worker)return;ocrBusy=true;
-  const it=items.find(i=>i.upc===upc);
-  try{
-    it.tries=(it.tries||0)+1;
-    let got={};
-    const c=cropFor(b,it.tries%4===0); // mostly deskewed; every 4th try a straight crop
-    if(c){const r=await worker.recognize(c);got=parseText(r.data.text||'')}
-    vote(it,got);
-  }catch(e){}
+const SCALES=[285,200,250,320,220,265];
+const work=document.createElement('canvas'),wx=work.getContext('2d',{willReadFrequently:true});
+function scaled(c,k){const s=SCALES[k%SCALES.length]/c.bw;work.width=Math.round(c.width*s);work.height=Math.round(c.height*s);wx.drawImage(c,0,0,work.width,work.height);return work}
+const snaps={}; // upc -> [{c,tried}]
+let ocrBusy=false,inView='';
+function pickJob(){
+  const cand=items.filter(i=>!i.manual&&!i.ok&&snaps[i.upc]&&snaps[i.upc].length);
+  cand.sort((a,b)=>(b.upc===inView)-(a.upc===inView));
+  for(const it of cand){const ss=snaps[it.upc];const s=ss.reduce((m,x)=>x.tried<m.tried?x:m,ss[0]);if(s.tried<SCALES.length)return{it,s}}
+  for(const it of items){if(it.ok&&!it.acdOk&&!it.manual&&snaps[it.upc]&&snaps[it.upc].length){const ss=snaps[it.upc];const s=ss.reduce((m,x)=>x.tried<m.tried?x:m,ss[0]);if(s.tried<SCALES.length)return{it,s}}}
+  return null;
+}
+async function pump(){
+  if(ocrBusy||!worker)return;const job=pickJob();if(!job)return;
+  ocrBusy=true;
+  try{const r=await worker.recognize(scaled(job.s.c,job.s.tried++));vote(job.it,parseText(r.data.text||''))}catch(e){}
   ocrBusy=false;
+  const it=job.it;if(!it.ok&&snaps[it.upc].length>=2&&snaps[it.upc].every(s=>s.tried>=SCALES.length)&&it.upc!==inView&&!it.gaveUp){it.gaveUp=true;save();render()}
+  setTimeout(pump,0);
 }
 function vote(it,got){
   it.v=it.v||{gm:{},acd:{}};
   if(got.gm)it.v.gm[got.gm]=(it.v.gm[got.gm]||0)+1;
   if(got.acd)it.v.acd[got.acd]=(it.v.acd[got.acd]||0)+1;
-  const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1])[0];
+  const top=(o,need)=>{const e=Object.entries(o).sort((a,b)=>b[1]-a[1]);if(!e.length)return null;const n2=e[1]?e[1][1]:0;return[e[0][0],e[0][1],(e[0][1]>=need&&n2===0)||(e[0][1]>=need+1&&e[0][1]>=2*n2)]};
   const was=it.gm||'',hadOk=!!it.ok;
-  if(!it.manual){const g=top(it.v.gm),a=top(it.v.acd);if(g){it.gm=g[0];it.ok=g[1]>=2}if(a){it.acd=a[0];it.acdOk=a[1]>=2}if(g||a)delete it.other}
+  if(!it.manual){const g=top(it.v.gm,2),a=top(it.v.acd,3);if(g){it.gm=g[0];it.ok=g[2]}if(a){it.acd=a[0];it.acdOk=a[2]}if(g||a)delete it.other}
   it.reads=(it.reads||0)+((got.gm||got.acd)?1:0);
   it.sent=false;save();
-  if(!hadOk&&it.ok){beep(S.hit);navigator.vibrate&&navigator.vibrate(40);$('hud').textContent='✓ GM '+it.gm+(it.acd?'  ACD '+it.acd:'');render(it.upc)}
-  else if(!it.ok&&it.gm){$('hud').textContent='GM '+it.gm+'? checking…';if(was!==it.gm)render()}
-  else render();
+  if(!hadOk&&it.ok){delete it.gaveUp;beep(S.hit);navigator.vibrate&&navigator.vibrate(40);if(it.upc===inView||Date.now()-lastHit>1500)$('hud').textContent='✓ GM '+it.gm+(it.acd?'  ACD '+it.acd:'');lastHit=Date.now();render(it.upc);dropThumb(it.upc)}
+  else if(!it.ok&&it.gm){if(it.upc===inView)$('hud').textContent='GM '+it.gm+'? checking…';if(was!==it.gm)render()}
 }
+let lastHit=0;
+// ---------- saved pictures (for typing the number later) ----------
+let idb=null;try{const r=indexedDB.open('lc',1);r.onupgradeneeded=()=>r.result.createObjectStore('t');r.onsuccess=()=>{idb=r.result;render()}}catch(e){}
+const thumbs={};
+function putThumb(upc,c){try{const d=c.toDataURL('image/jpeg',.6);thumbs[upc]=d;idb&&idb.transaction('t','readwrite').objectStore('t').put(d,upc)}catch(e){}}
+function dropThumb(upc){delete thumbs[upc];try{idb&&idb.transaction('t','readwrite').objectStore('t').delete(upc)}catch(e){}}
+function getThumb(upc){return new Promise(res=>{if(thumbs[upc])return res(thumbs[upc]);if(!idb)return res(null);try{const q=idb.transaction('t').objectStore('t').get(upc);q.onsuccess=()=>{if(q.result)thumbs[upc]=q.result;res(q.result||null)};q.onerror=()=>res(null)}catch(e){res(null)}})}
 // ---------- loop ----------
 const seen={}; // upc -> last time in view
-let needT=null;
 async function tick(){
   if(!stream)return;
   if(!paused&&det&&!busy){
@@ -140,30 +154,28 @@ async function tick(){
       const codes=await det.detect($('vid'));
       const now=Date.now();let any=false;
       for(const b of codes){
-        const c=normUpc(b.rawValue);if(!c)continue;any=true;
+        const c=normUpc(b.rawValue);if(!c)continue;any=true;inView=c;
         let it=items.find(i=>i.upc===c);
-        if(!it){it={upc:c,at:now};items.unshift(it);save();render(c);beep(S.seen);$('hud').textContent='UPC '+c+' · reading…';
-          clearTimeout(needT);needT=setTimeout(()=>{const x=items.find(i=>i.upc===c);if(x&&!(x.gm||x.acd||x.other)){beep(S.need);$('hud').textContent='No number yet for '+c+'. Hold a bit closer.'}},2500)}
-        else if(!seen[c]||now-seen[c]>3000){beep(S.seen);if(it.gm||it.acd)$('hud').textContent='Have '+c+' → '+(it.gm||it.acd)}
+        if(!it){it={upc:c,at:now};items.unshift(it);save();render(c);beep(S.seen);navigator.vibrate&&navigator.vibrate(15);$('hud').textContent='UPC '+c+' · reading…'}
+        else if(!seen[c]||now-seen[c]>3000){beep(S.seen);$('hud').textContent=it.ok?'Have '+c+' → GM '+it.gm:'UPC '+c+' · reading…'}
         seen[c]=now;
-        // keep reading while it's in view: until resolved, then 2 more confirming reads
-        if(!it.manual&&(!it.ok||(it.reads||0)<4)&&(it.tries||0)<14)ocrCode(c,b);
+        if(!it.manual&&!it.ok){
+          const ss=snaps[c]=snaps[c]||[];
+          if(ss.length<4&&(!ss.last||now-ss.last>300)){const sc=snap(b);if(sc==='far'){if(!it.gm)$('hud').textContent='UPC '+c+' · move closer so the numbers are bigger'}else if(sc){ss.push({c:sc,tried:0});ss.last=now;if(ss.length===1||ss.length===3)putThumb(c,sc);if(it.gaveUp){delete it.gaveUp;render()}}}
+          pump();
+        }
       }
+      if(!any)inView='';
       $('frame').classList.toggle('hit',any);
-      if(!any&&now-Math.max(0,...Object.values(seen))>3000)$('hud').textContent=worker?'Point at a label: barcode and GM# in view':'Loading text reader…';
+      if(!any&&now-Math.max(0,...Object.values(seen))>2500)$('hud').textContent=worker?'Point at a label: barcode and numbers in view':'Loading text reader…';
     }catch(e){$('hud').textContent='Camera error: '+(e.message||e)}
     busy=false;
   }
   setTimeout(tick,120);
 }
-function upsert(upc,got){
-  let it=items.find(i=>i.upc===upc);
-  if(!it){it={upc,at:Date.now()};items.unshift(it)}
-  if(got.gm)it.gm=got.gm;if(got.acd)it.acd=got.acd;it.sent=false;save();render(upc);
-}
 // text reader loads as soon as the page opens, not when the camera starts
-const workerReady=(async()=>{
-  try{worker=await Tesseract.createWorker('eng');await worker.setParameters({tessedit_pageseg_mode:'11'});if(stream)$('hud').textContent='Point at a label: barcode and GM# in view'}
+(async()=>{
+  try{worker=await Tesseract.createWorker('eng');await worker.setParameters({tessedit_pageseg_mode:'11'});if(stream)$('hud').textContent='Point at a label: barcode and numbers in view';pump()}
   catch(e){worker=null;if(stream)$('hud').textContent='Text reader failed to load. UPCs still save; type the numbers.'}
 })();
 // ---------- UI ----------
@@ -172,10 +184,22 @@ function render(flash){
   const un=items.filter(i=>!i.sent&&(i.gm||i.acd||i.other)).length;
   $('cnt').textContent=items.length+' total · '+un+' not sent';
   $('send').textContent=un?'Send '+un+' to scanner':'Send to scanner';
-  $('list').innerHTML=items.map((i,n)=>'<div class="item'+(i.upc===flash?' new':'')+((!(i.gm||i.acd||i.other)||(i.gm&&!i.ok&&!i.manual))?' need':'')+'"><div><div class="upc">UPC '+esc(i.upc)+(i.sent?' <span class="sent">✓ sent</span>':'')+'</div><div class="pn"><input data-n="'+n+'" data-f="gm" value="'+esc(i.gm||i.other||'')+'" placeholder="GM / part #" autocapitalize="characters"><input class="acd" data-n="'+n+'" data-f="acd" value="'+esc(i.acd||'')+'" placeholder="ACD #" autocapitalize="characters"></div></div><button data-del="'+n+'">✕</button></div>').join('')||'<div class="msg">Nothing yet. Start the camera and point it at a label.</div>';
+  $('list').innerHTML=items.map((i,n)=>'<div class="item'+(i.upc===flash?' new':'')+((!(i.gm||i.acd||i.other)||(i.gm&&!i.ok&&!i.manual))?' need':'')+'"><div><div class="upc">UPC '+esc(i.upc)+(i.sent?' <span class="sent">✓ sent</span>':'')+(i.ok||i.manual?'':(i.gaveUp?' <span class="st bad">couldn\'t read · tap 📷</span>':(i.gm?' <span class="st">checking…</span>':' <span class="st">reading…</span>')))+'</div><div class="pn"><input data-n="'+n+'" data-f="gm" value="'+esc(i.gm||i.other||'')+'" placeholder="GM / part #" autocapitalize="characters"><input class="acd" data-n="'+n+'" data-f="acd" value="'+esc(i.acd||'')+'" placeholder="ACD #" autocapitalize="characters"></div></div><div class="btns">'+(i.ok||i.manual?'':'<button data-pic="'+esc(i.upc)+'">📷</button>')+'<button data-del="'+n+'">✕</button></div></div>').join('')||'<div class="msg">Nothing yet. Start the camera and point it at a label.</div>';
 }
 $('list').addEventListener('change',e=>{const i=e.target.closest('input');if(!i)return;const it=items[+i.dataset.n];if(!it)return;const v=i.value.trim().toUpperCase();it.manual=true;if(i.dataset.f==='gm'){if(/^\d{7,8}$/.test(v)){it.gm=v;delete it.other}else{delete it.gm;it.other=v||undefined}}else it.acd=v||undefined;it.sent=false;save();render()});
-$('list').addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;items.splice(+b.dataset.del,1);save();render()});
+$('list').addEventListener('click',e=>{const pb=e.target.closest('[data-pic]');if(pb){showPic(pb.dataset.pic);return}const b=e.target.closest('[data-del]');if(!b)return;dropThumb(items[+b.dataset.del].upc);items.splice(+b.dataset.del,1);save();render()});
+async function showPic(upc){
+  const it=items.find(i=>i.upc===upc);if(!it)return;const d=await getThumb(upc);
+  const o=document.createElement('div');o.className='pic';
+  o.innerHTML='<div class="upc">UPC '+esc(upc)+'</div>'+(d?'<img alt="">':'<div class="msg">No picture saved for this one.</div>')+'<div class="pn"><input id="pgm" placeholder="GM / part #" inputmode="text" autocapitalize="characters"><input id="pacd" class="acd" placeholder="ACD #" autocapitalize="characters"></div><div class="row"><button class="pri" id="psave">Save</button><button id="pclose">Close</button></div>';
+  if(d)o.querySelector('img').src=d;
+  o.querySelector('#pgm').value=it.gm||it.other||'';o.querySelector('#pacd').value=it.acd||'';
+  document.body.appendChild(o);const was=paused;paused=true;
+  const close=()=>{o.remove();paused=was};
+  o.querySelector('#pclose').onclick=close;
+  o.querySelector('#psave').onclick=()=>{const g=o.querySelector('#pgm').value.trim().toUpperCase(),a=o.querySelector('#pacd').value.trim().toUpperCase();
+    if(g||a){it.manual=true;if(/^\d{7,8}$/.test(g)){it.gm=g;delete it.other}else{delete it.gm;it.other=g||undefined}it.acd=a||undefined;it.sent=false;save();dropThumb(upc);beep(S.hit)}close();render()};
+}
 function payload(all){return items.filter(i=>(all||!i.sent)&&(i.gm||i.acd||i.other)).map(i=>[i.upc,i.gm||i.other||i.acd,i.gm?'GM':(i.other?'':'ACD'),i.gm&&i.acd&&(i.acdOk||i.manual)?i.acd:''].join(':')).join(',')}
 $('send').onclick=()=>{const p=payload(false);if(!p){toast('Nothing new to send.',true);return}beep(S.send);items.forEach(i=>{if(i.gm||i.acd||i.other)i.sent=true});save();render();window.open(SCANNER+'#learn='+encodeURIComponent(p),'_blank')};
 $('copy').onclick=async()=>{const p=payload(true);try{await navigator.clipboard.writeText('LEARN '+p);toast('Copied. Paste it into the scanner\'s Import box.')}catch(e){toast('Copy blocked.',true)}};
@@ -194,7 +218,7 @@ $('go').onclick=async()=>{
   $('vid').srcObject=stream;$('startv').hidden=true;$('camv').hidden=false;
   try{if('wakeLock' in navigator)await navigator.wakeLock.request('screen')}catch(e){}
   tick();
-  $('hud').textContent=worker?'Point at a label: barcode and GM# in view':'Loading text reader (first time only)…';
+  $('hud').textContent=worker?'Point at a label: barcode and numbers in view':'Loading text reader (first time only)…';
 };
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&stream&&!stream.active)location.reload()});
 render();

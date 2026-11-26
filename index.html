@@ -46,7 +46,7 @@ h2 span{margin-left:auto;font-size:13px;color:var(--mute)}
 </head><body>
 <div id="startv" class="start">
   <h1 style="margin:0;font-size:24px">Label Camera</h1>
-  <p>Point at a GM, ACDelco, Ford, Motorcraft or Mopar label. It grabs the UPC barcode right away, reads the part number in the background, and double-beeps when it's sure. If it can't read one, the picture is kept so you can type the number later. Then tap <b>Send to scanner</b> to teach the Iowa scanner every UPC at once.</p>
+  <p>Point at a GM, ACDelco, Ford, Motorcraft or Mopar label. It grabs the UPC barcode right away, reads the part number in the background, and double-beeps when it's sure. If it can't read one, the picture is kept so you can type the number later. Then tap <b>Send to scanner</b> and tap <b>📥</b> in the Iowa scanner to teach it every UPC at once.</p>
   <button class="pri" id="go">Start camera</button>
   <p id="sup"></p>
 </div>
@@ -245,7 +245,14 @@ async function showPic(upc){
 }
 const BCODE={GM:'GM',ACDelco:'ACD',Ford:'FORD',Motorcraft:'FORD',Mopar:'OTH'};
 function payload(all){return items.filter(i=>(all||!i.sent)&&i.part).map(i=>[i.upc,i.part,BCODE[i.brand]||'',i.alt&&(i.altOk||i.manual)?i.alt:''].join(':')).join(',')}
-$('send').onclick=()=>{const p=payload(false);if(!p){toast('Nothing new to send.',true);return}beep(S.send);items.forEach(i=>{if(i.part)i.sent=true});save();render();window.open(SCANNER+'#learn='+encodeURIComponent(p),'_blank')};
+$('send').onclick=async()=>{const p=payload(false);if(!p){toast('Nothing new to send.',true);return}
+  let ok=false;try{await navigator.clipboard.writeText('LEARN '+p);ok=true}catch(e){}
+  if(!ok){try{const ta=document.createElement('textarea');ta.value='LEARN '+p;document.body.appendChild(ta);ta.select();ok=document.execCommand('copy');ta.remove()}catch(e){}}
+  if(!ok){toast('Couldn\'t copy. Try again.',true);return}
+  beep(S.send);const n=items.filter(i=>!i.sent&&i.part).length;items.forEach(i=>{if(i.part)i.sent=true});save();render();
+  $('msg').innerHTML='<b>Copied '+n+'.</b> Now in the Iowa scanner tap <b>📥</b> (top row, next to 🖼). If it asks, long-press the box, Paste, Import.';
+  toast('Copied '+n+'. In the scanner tap 📥');
+  setTimeout(()=>window.open(SCANNER,'_blank'),600)};
 $('copy').onclick=async()=>{const p=payload(true);try{await navigator.clipboard.writeText('LEARN '+p);toast('Copied. Paste it into the scanner\'s Import box.')}catch(e){toast('Copy blocked.',true)}};
 $('clear').onclick=()=>{items=items.filter(i=>!i.sent);save();render()};
 $('pause').onclick=()=>{paused=!paused;$('pause').classList.toggle('on',paused);$('pause').textContent=paused?'Resume':'Pause';$('hud').textContent=paused?'Paused':'Point at a label'};

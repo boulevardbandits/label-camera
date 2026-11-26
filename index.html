@@ -17,6 +17,7 @@ video{width:100%;height:100%;object-fit:cover;display:block}
 button{font:700 16px system-ui;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 14px;min-height:48px;cursor:pointer}
 button.pri{background:var(--blue);border-color:var(--blue)}
 button.on{background:#ffd60a;color:#000}
+button.stopb{background:#b3261e;border-color:#b3261e}
 .wrap{padding:12px 14px 40px;max-width:640px;margin:0 auto}
 .start{display:flex;flex-direction:column;gap:10px;align-items:stretch;padding:24px 14px}
 .start p{color:var(--mute);margin:0}
@@ -28,7 +29,7 @@ button.on{background:#ffd60a;color:#000}
 .upc{font:600 13px ui-monospace,Menlo,monospace;color:var(--mute)}
 .pn{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .pn input{font:800 20px ui-monospace,Menlo,monospace;width:9.5em;max-width:100%;padding:6px 8px;border-radius:9px;border:1px solid var(--line);background:#0a0a0c;color:#fff;text-transform:uppercase}
-.pn input.acd{font-size:15px;width:8em}
+.pn input.acd{font-size:15px;width:11em}
 .item button{min-height:40px;padding:6px 10px;font-size:14px}
 .sent{font-size:12px;color:var(--ok)}
 .st{font-size:12px;color:var(--warn)}.st.bad{color:var(--bad)}
@@ -45,13 +46,13 @@ h2 span{margin-left:auto;font-size:13px;color:var(--mute)}
 </head><body>
 <div id="startv" class="start">
   <h1 style="margin:0;font-size:24px">Label Camera</h1>
-  <p>Point at a GM or ACDelco label. It grabs the UPC barcode right away, reads the GM# and ACD# in the background, and double-beeps when it's sure. If it can't read one, the picture is kept so you can type the number later. Then tap <b>Send to scanner</b> to teach the Iowa scanner every UPC at once.</p>
+  <p>Point at a GM, ACDelco, Ford, Motorcraft or Mopar label. It grabs the UPC barcode right away, reads the part number in the background, and double-beeps when it's sure. If it can't read one, the picture is kept so you can type the number later. Then tap <b>Send to scanner</b> to teach the Iowa scanner every UPC at once.</p>
   <button class="pri" id="go">Start camera</button>
   <p id="sup"></p>
 </div>
 <div id="camv" hidden>
   <div class="cam"><video id="vid" playsinline muted autoplay></video><div class="frame" id="frame"></div>
-    <div class="top"><button id="torch" hidden>Light</button><button id="pause">Pause</button></div>
+    <div class="top"><button id="torch" hidden>Light</button><button id="pause">Pause</button><button id="stop" class="stopb">Stop camera</button></div>
     <div class="hud" id="hud">Starting…</div></div>
 </div>
 <div class="wrap">
@@ -68,9 +69,10 @@ h2 span{margin-left:auto;font-size:13px;color:var(--mute)}
 const SCANNER='https://claude.ai/artifact/FoodK6kYyaWVeGxvGg7qQe';
 const $=id=>document.getElementById(id);
 const LS={get(k,d){try{const v=localStorage.getItem('lc_'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('lc_'+k,JSON.stringify(v))}catch(e){}}};
-let items=LS.get('items',[]); // {upc,gm,acd,other,at,sent,conf}
+// item: {upc,at,part,brand,alt,ok,altOk,manual,gaveUp,sent,v:{field:{value:count}}}
+let items=LS.get('items',[]).map(i=>{if(i.part===undefined&&(i.gm||i.other||i.acd)){i.part=i.gm||i.other||i.acd;i.brand=i.gm?'GM':(i.other?'':'ACDelco');i.alt=i.gm?(i.acd||''):'';i.altOk=i.acdOk;delete i.gm;delete i.acd;delete i.other;delete i.acdOk;i.v=null}return i});
 const save=()=>LS.set('items',items);
-let stream=null,track=null,det=null,worker=null,paused=false,busy=false;
+let stream=null,track=null,det=null,worker=null,paused=false,busy=false,wake=null;
 let ac=null;
 function beep(seq){try{ac=ac||new AudioContext();if(ac.state==='suspended')ac.resume();for(const[f,t,d]of seq){const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.connect(g);g.connect(ac.destination);const s=ac.currentTime+t;g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.35,s+.008);g.gain.exponentialRampToValueAtTime(.0001,s+d);o.start(s);o.stop(s+d+.03)}}catch(e){}}
 const S={hit:[[1319,0,.07],[1760,.075,.12]],seen:[[1175,0,.06]],need:[[330,0,.15],[247,.18,.2]],send:[[784,0,.08],[1047,.08,.08],[1319,.16,.14]]};
@@ -78,64 +80,100 @@ let toastT;function toast(t,bad){const el=$('toast');el.textContent=t;el.classNa
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function normUpc(r){const d=String(r).replace(/\D/g,'');if(d.length===12)return d;if(d.length===13&&d[0]==='0')return d.slice(1);if(d.length===11)return '0'+d;return null}
 
-// ---------- OCR ----------
+// ---------- reading the printed part numbers ----------
+// Formats seen on this auction's boxes:
+//  GM        GM# 84621038 (8 digits)
+//  ACDelco   ACD# 15-80875 / 177-1047 / 14D1275CHF2 / 18A927A / PF61E / UPF63R / CF185
+//  Ford      JL3Z-9943400-GB (often printed with spaces), EU2Z-2V001-C, 9T4Z-78044A74-AB, VJL3Z-84501A42-C
+//  Motorcraft BR-1680, BRF-1959, ASH-866238, FL-820S, BXT-65-850, CX-2701
+//  Mopar     82215584AB
+const UPCISH=/^(7?07773|8?08709|1?93468|0?31508|6?06075)/;
+const ACD_RE=/(?<![A-Z0-9-])(\d{2}[AD]\d{3,5}[A-Z]{0,4}\d?|U?PF\d{2,4}[A-Z]{0,2}|CF\d{2,4}[A-Z]?|A\d{4}C|\d{1,3}-\d{3,5})(?![A-Z0-9-])/;
+const FORD_RE=/(?<![A-Z0-9])(V?(?=[A-Z0-9]{0,3}[A-Z])[A-Z0-9]{2}\d[A-Z0-9])[ -]{1,2}(\d[0-9A-Z]{3,9})[ -]{1,2}([A-Z]{1,3})(?![A-Z0-9])/;
+const MC_RE=/(?<![A-Z0-9-])([A-Z]{2,4})-(\d[0-9A-Z]{0,6}(?:-\d{2,4})?)(?![A-Z0-9])/g;
+const MC_NOT=/^(GM|LC|GR|QTY|ACD|AC|CD|MI|USA|EL|EN|CH|DT|BT|GE|KM)$/;
 function parseText(t){
-  const lines=t.toUpperCase().replace(/[|]/g,'1').split(/\n+/).map(s=>s.trim()).filter(Boolean);
-  let gm=null,acd=null,m;
+  const T=t.toUpperCase().replace(/[|]/g,'1');
+  const lines=T.split(/\n+/).map(s=>s.trim()).filter(Boolean);
+  const r={};let m;
   for(const L of lines){
-    if(!gm&&(m=L.match(/G[MN]\s*[#:]?\s*([0-9OIL ]{8,10})/))){const d=m[1].replace(/O/g,'0').replace(/[IL]/g,'1').replace(/ /g,'');if(/^\d{8}$/.test(d))gm=d}
-    if(!acd&&(m=L.match(/A?[CO]?[DO0P]\s*#\s*([A-Z0-9][A-Z0-9\- ]{2,16})/))){const v=m[1].replace(/ /g,'').replace(/-+$/,'');if(/\d/.test(v)&&v.length>=4)acd=v}
+    if(!r.gm&&(m=L.match(/G[MN]\s*[#:]?\s*([0-9OIL ]{8,10})/))){const d=m[1].replace(/O/g,'0').replace(/[IL]/g,'1').replace(/ /g,'');if(/^\d{8}$/.test(d))r.gm=d}
+    if(!r.acd&&(m=L.match(/A?[CO]?[DO0P]\s*#\s*([A-Z0-9][A-Z0-9\- ]{2,16})/))){const v=m[1].replace(/ /g,'').replace(/-+$/,'');if(/\d/.test(v)&&v.length>=4)r.acd=v}
   }
-  if(!gm){const c=(t.match(/(?<![\d.])[1-9]\d{7}(?![\d.])/g)||[]).filter(x=>!/^7?07773|^8?08709/.test(x));if(c.length)gm=c[0]}
-  if(!acd){const c=t.match(/(?<![\d.])\d{1,3}-\d{3,6}(?![\d.])/);if(c)acd=c[0]}
-  return{gm,acd};
+  if(!r.acd){for(const L of lines){if(/QTY|LC\s?\d|GR\./.test(L))continue;const c=L.match(ACD_RE);if(c){r.acd=c[1];break}}}
+  if((m=T.match(FORD_RE)))r.ford=m[1]+'-'+m[2]+'-'+m[3];
+  if((m=T.match(/(?<![0-9A-Z])(\d{8}A[A-Z])(?![0-9A-Z])/)))r.mopar=m[1];
+  if(!r.gm&&!r.ford){const c=(T.match(/(?<![\dA-Z.\-])[1-9]\d{7}(?![\dA-Z.\-])/g)||[]).filter(x=>!UPCISH.test(x));if(c.length)r.gm=c[0]}
+  if(!r.gm){for(const mm of T.matchAll(MC_RE)){if(MC_NOT.test(mm[1]))continue;const v=mm[1]+'-'+mm[2];if(r.acd===v||(r.ford&&r.ford.startsWith(v)))continue;r.mc=v;break}}
+  return r;
 }
-// Snapshot the area around the barcode (GM labels: numbers above it; ACDelco labels:
-// numbers up and to the left). Deskewed with the barcode corners, saved per UPC so it
-// can keep being read after the box is gone.
-const SNAPW=300; // barcode width in snapshot px
+const FIELDS=['gm','ford','mopar','mc','acd'];
+const NEED={gm:2,ford:2,mopar:2,mc:2,acd:3};
+function topOf(o,need){const e=Object.entries(o||{}).sort((a,b)=>b[1]-a[1]);if(!e.length)return null;const n2=e[1]?e[1][1]:0;return{val:e[0][0],ok:(e[0][1]>=need&&n2===0)||(e[0][1]>=need+1&&e[0][1]>=2*n2)}}
+function derive(it){
+  const t={};for(const f of FIELDS)t[f]=topOf(it.v[f],NEED[f]);
+  let part=null,brand='',alt=null;
+  if(t.gm){part=t.gm;brand='GM';alt=t.acd}
+  else if(t.ford){part=t.ford;brand=t.mc?'Motorcraft':'Ford';alt=t.mc}
+  else if(t.mopar){part=t.mopar;brand='Mopar'}
+  else if(t.mc){part=t.mc;brand='Motorcraft'}
+  else if(t.acd){part=t.acd;brand='ACDelco'}
+  if(!part)return;
+  it.part=part.val;it.brand=brand;it.ok=part.ok;
+  it.alt=alt?alt.val:'';it.altOk=!!(alt&&alt.ok);
+}
+// Snapshot a wide area around the barcode, deskewed with the barcode's corners.
+// Region (in barcode widths, barcode's top-left = 0,0): x -6 .. +2.2, y -3.4 .. +0.1
+// GM / ACDelco labels: numbers above the barcode. Motorcraft: numbers up and far left.
+const RX0=-6,RX1=2.2,RY0=-3.4,RY1=0.1,SNAPW=240;
 function snap(b){
   const v=$('vid');const p=b.cornerPoints,bb=b.boundingBox;
   let ang=0,bw=bb.width,x0=bb.x,y0=bb.y;
   if(p&&p.length===4){ang=Math.atan2(p[1].y-p[0].y,p[1].x-p[0].x);bw=Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);x0=p[0].x;y0=p[0].y}
-  if(bw<150)return 'far'; // too small to read the printed numbers reliably
+  if(bw<110)return 'far'; // too small to read the printed numbers
   const s=Math.min(3,SNAPW/bw);
-  const c=document.createElement('canvas');c.width=Math.round(4.2*bw*s);c.height=Math.round(1.95*bw*s);
+  const c=document.createElement('canvas');c.width=Math.round((RX1-RX0)*bw*s);c.height=Math.round((RY1-RY0)*bw*s);
   const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.filter='grayscale(1)';
-  x.translate(2.3*bw*s,1.9*bw*s);x.scale(s,s);x.rotate(-ang);x.translate(-x0,-y0);x.drawImage(v,0,0);
+  x.translate(-RX0*bw*s,-RY0*bw*s);x.scale(s,s);x.rotate(-ang);x.translate(-x0,-y0);x.drawImage(v,0,0);
   c.bw=bw*s;return c;
 }
-const SCALES=[285,200,250,320,220,265];
+// Each snapshot is read several ways: [region, barcode width in px]. A = near the barcode
+// (GM/ACDelco), B = the wide area (Motorcraft and anything else).
+const A=[-2.3,1.9,-1.9,0.05],B=[RX0,1.0,-3.2,0.1];
+const JOBS=[[A,285],[A,200],[B,230],[A,250],[B,195],[A,320],[B,265],[A,220]];
 const work=document.createElement('canvas'),wx=work.getContext('2d',{willReadFrequently:true});
-function scaled(c,k){const s=SCALES[k%SCALES.length]/c.bw;work.width=Math.round(c.width*s);work.height=Math.round(c.height*s);wx.drawImage(c,0,0,work.width,work.height);return work}
+function region(c,j){const [r,w]=JOBS[j];const bw=c.bw,s=w/bw;const sx=(r[0]-RX0)*bw,sy=(r[2]-RY0)*bw,sw=(r[1]-r[0])*bw,sh=(r[3]-r[2])*bw;
+  work.width=Math.round(sw*s);work.height=Math.round(sh*s);wx.fillStyle='#fff';wx.fillRect(0,0,work.width,work.height);wx.drawImage(c,sx,sy,sw,sh,0,0,work.width,work.height);return work}
 const snaps={}; // upc -> [{c,tried}]
 let ocrBusy=false,inView='';
+function nextSnap(it){const ss=snaps[it.upc];if(!ss||!ss.length)return null;const s=ss.reduce((m,x)=>x.tried<m.tried?x:m,ss[0]);return s.tried<JOBS.length?s:null}
 function pickJob(){
-  const cand=items.filter(i=>!i.manual&&!i.ok&&snaps[i.upc]&&snaps[i.upc].length);
+  const cand=items.filter(i=>!i.manual&&!i.ok&&snaps[i.upc]);
   cand.sort((a,b)=>(b.upc===inView)-(a.upc===inView));
-  for(const it of cand){const ss=snaps[it.upc];const s=ss.reduce((m,x)=>x.tried<m.tried?x:m,ss[0]);if(s.tried<SCALES.length)return{it,s}}
-  for(const it of items){if(it.ok&&!it.acdOk&&!it.manual&&snaps[it.upc]&&snaps[it.upc].length){const ss=snaps[it.upc];const s=ss.reduce((m,x)=>x.tried<m.tried?x:m,ss[0]);if(s.tried<SCALES.length)return{it,s}}}
+  for(const it of cand){const s=nextSnap(it);if(s)return{it,s}}
+  for(const it of items){if(it.ok&&!it.altOk&&!it.manual&&snaps[it.upc]){const s=nextSnap(it);if(s)return{it,s}}}
   return null;
 }
 async function pump(){
   if(ocrBusy||!worker)return;const job=pickJob();if(!job)return;
   ocrBusy=true;
-  try{const r=await worker.recognize(scaled(job.s.c,job.s.tried++));vote(job.it,parseText(r.data.text||''))}catch(e){}
+  try{const r=await worker.recognize(region(job.s.c,job.s.tried++));vote(job.it,parseText(r.data.text||''))}catch(e){}
   ocrBusy=false;
-  const it=job.it;if(!it.ok&&snaps[it.upc].length>=2&&snaps[it.upc].every(s=>s.tried>=SCALES.length)&&it.upc!==inView&&!it.gaveUp){it.gaveUp=true;save();render()}
+  const it=job.it,ss=snaps[it.upc]||[];const done=ss.length>=2&&ss.every(s=>s.tried>=JOBS.length);
+  if(!it.ok&&done&&it.upc!==inView&&!it.gaveUp){it.gaveUp=true;save();render()}
+  if((it.ok&&(it.altOk||done))||it.gaveUp)delete snaps[it.upc]; // free memory
   setTimeout(pump,0);
 }
 function vote(it,got){
-  it.v=it.v||{gm:{},acd:{}};
-  if(got.gm)it.v.gm[got.gm]=(it.v.gm[got.gm]||0)+1;
-  if(got.acd)it.v.acd[got.acd]=(it.v.acd[got.acd]||0)+1;
-  const top=(o,need)=>{const e=Object.entries(o).sort((a,b)=>b[1]-a[1]);if(!e.length)return null;const n2=e[1]?e[1][1]:0;return[e[0][0],e[0][1],(e[0][1]>=need&&n2===0)||(e[0][1]>=need+1&&e[0][1]>=2*n2)]};
-  const was=it.gm||'',hadOk=!!it.ok;
-  if(!it.manual){const g=top(it.v.gm,2),a=top(it.v.acd,3);if(g){it.gm=g[0];it.ok=g[2]}if(a){it.acd=a[0];it.acdOk=a[2]}if(g||a)delete it.other}
-  it.reads=(it.reads||0)+((got.gm||got.acd)?1:0);
-  it.sent=false;save();
-  if(!hadOk&&it.ok){delete it.gaveUp;beep(S.hit);navigator.vibrate&&navigator.vibrate(40);if(it.upc===inView||Date.now()-lastHit>1500)$('hud').textContent='✓ GM '+it.gm+(it.acd?'  ACD '+it.acd:'');lastHit=Date.now();render(it.upc);dropThumb(it.upc)}
-  else if(!it.ok&&it.gm){if(it.upc===inView)$('hud').textContent='GM '+it.gm+'? checking…';if(was!==it.gm)render()}
+  it.v=it.v||{};let any=false;
+  for(const f of FIELDS)if(got[f]){any=true;const o=it.v[f]=it.v[f]||{};o[got[f]]=(o[got[f]]||0)+1}
+  if(!any||it.manual)return;
+  const was=it.part||'',hadOk=!!it.ok;
+  derive(it);it.sent=false;save();
+  const label=()=>(it.brand?it.brand+' ':'')+it.part+(it.alt?'  ('+it.alt+')':'');
+  if(!hadOk&&it.ok){delete it.gaveUp;beep(S.hit);navigator.vibrate&&navigator.vibrate(40);if(it.upc===inView||Date.now()-lastHit>1500)$('hud').textContent='✓ '+label();lastHit=Date.now();render(it.upc);dropThumb(it.upc)}
+  else if(!it.ok&&it.part){if(it.upc===inView)$('hud').textContent=label()+'? checking…';if(was!==it.part)render()}
+  else render();
 }
 let lastHit=0;
 // ---------- saved pictures (for typing the number later) ----------
@@ -157,11 +195,12 @@ async function tick(){
         const c=normUpc(b.rawValue);if(!c)continue;any=true;inView=c;
         let it=items.find(i=>i.upc===c);
         if(!it){it={upc:c,at:now};items.unshift(it);save();render(c);beep(S.seen);navigator.vibrate&&navigator.vibrate(15);$('hud').textContent='UPC '+c+' · reading…'}
-        else if(!seen[c]||now-seen[c]>3000){beep(S.seen);$('hud').textContent=it.ok?'Have '+c+' → GM '+it.gm:'UPC '+c+' · reading…'}
+        else if(!seen[c]||now-seen[c]>3000){beep(S.seen);$('hud').textContent=it.ok||it.manual?'Have '+c+' → '+(it.brand?it.brand+' ':'')+it.part:'UPC '+c+' · reading…'}
         seen[c]=now;
         if(!it.manual&&!it.ok){
           const ss=snaps[c]=snaps[c]||[];
-          if(ss.length<4&&(!ss.last||now-ss.last>300)){const sc=snap(b);if(sc==='far'){if(!it.gm)$('hud').textContent='UPC '+c+' · move closer so the numbers are bigger'}else if(sc){ss.push({c:sc,tried:0});ss.last=now;if(ss.length===1||ss.length===3)putThumb(c,sc);if(it.gaveUp){delete it.gaveUp;render()}}}
+          if(ss.length<3&&(!ss.last||now-ss.last>350)){const sc=snap(b);if(sc==='far'){if(!it.part)$('hud').textContent='UPC '+c+' · move closer so the numbers are bigger'}else if(sc){ss.push({c:sc,tried:0});ss.last=now;if(ss.length===1)putThumb(c,sc);if(it.gaveUp){delete it.gaveUp;render()}}}
+          const ks=Object.keys(snaps);if(ks.length>10)for(const k of ks.slice(0,ks.length-10))if(k!==c)delete snaps[k];
           pump();
         }
       }
@@ -179,48 +218,55 @@ async function tick(){
   catch(e){worker=null;if(stream)$('hud').textContent='Text reader failed to load. UPCs still save; type the numbers.'}
 })();
 // ---------- UI ----------
+const BRANDS=['GM','ACDelco','Ford','Motorcraft','Mopar',''];
+function guessBrand(p){p=(p||'').toUpperCase();if(/^\d{8}$/.test(p))return 'GM';if(/^\d{8}A[A-Z]$/.test(p))return 'Mopar';if(FORD_RE.test(p.replace(/-/g,' ')))return 'Ford';if(ACD_RE.test(p))return 'ACDelco';if(/^[A-Z]{2,4}-\d/.test(p))return 'Motorcraft';return ''}
+function setManual(it,part,alt){part=(part||'').trim().toUpperCase();alt=(alt||'').trim().toUpperCase();if(!part&&!alt)return false;it.manual=true;it.part=part||alt;it.alt=part?alt:'';it.altOk=true;it.ok=true;it.brand=guessBrand(it.part);delete it.gaveUp;it.sent=false;save();dropThumb(it.upc);return true}
 function render(flash){
   const ae=document.activeElement;if(ae&&ae.closest&&ae.closest('#list')&&ae.tagName==='INPUT'){clearTimeout(render.t);render.t=setTimeout(()=>render(flash),800);return}
-  const un=items.filter(i=>!i.sent&&(i.gm||i.acd||i.other)).length;
+  const un=items.filter(i=>!i.sent&&i.part).length;
   $('cnt').textContent=items.length+' total · '+un+' not sent';
   $('send').textContent=un?'Send '+un+' to scanner':'Send to scanner';
-  $('list').innerHTML=items.map((i,n)=>'<div class="item'+(i.upc===flash?' new':'')+((!(i.gm||i.acd||i.other)||(i.gm&&!i.ok&&!i.manual))?' need':'')+'"><div><div class="upc">UPC '+esc(i.upc)+(i.sent?' <span class="sent">✓ sent</span>':'')+(i.ok||i.manual?'':(i.gaveUp?' <span class="st bad">couldn\'t read · tap 📷</span>':(i.gm?' <span class="st">checking…</span>':' <span class="st">reading…</span>')))+'</div><div class="pn"><input data-n="'+n+'" data-f="gm" value="'+esc(i.gm||i.other||'')+'" placeholder="GM / part #" autocapitalize="characters"><input class="acd" data-n="'+n+'" data-f="acd" value="'+esc(i.acd||'')+'" placeholder="ACD #" autocapitalize="characters"></div></div><div class="btns">'+(i.ok||i.manual?'':'<button data-pic="'+esc(i.upc)+'">📷</button>')+'<button data-del="'+n+'">✕</button></div></div>').join('')||'<div class="msg">Nothing yet. Start the camera and point it at a label.</div>';
+  $('list').innerHTML=items.map((i,n)=>{
+    const st=i.ok||i.manual?'':(i.gaveUp?' <span class="st bad">couldn\'t read · tap 📷</span>':(i.part?' <span class="st">checking…</span>':' <span class="st">reading…</span>'));
+    return '<div class="item'+(i.upc===flash?' new':'')+((!i.part||(!i.ok&&!i.manual))?' need':'')+'"><div><div class="upc">UPC '+esc(i.upc)+(i.brand?' · <b>'+esc(i.brand)+'</b>':'')+(i.sent?' <span class="sent">✓ sent</span>':'')+st+'</div><div class="pn"><input data-n="'+n+'" data-f="part" value="'+esc(i.part||'')+'" placeholder="Part #" autocapitalize="characters"><input class="acd" data-n="'+n+'" data-f="alt" value="'+esc(i.alt||'')+'" placeholder="2nd # (ACD / Motorcraft)" autocapitalize="characters"></div></div><div class="btns">'+(i.ok||i.manual?'':'<button data-pic="'+esc(i.upc)+'">📷</button>')+'<button data-del="'+n+'">✕</button></div></div>'}).join('')||'<div class="msg">Nothing yet. Start the camera and point it at a label.</div>';
 }
-$('list').addEventListener('change',e=>{const i=e.target.closest('input');if(!i)return;const it=items[+i.dataset.n];if(!it)return;const v=i.value.trim().toUpperCase();it.manual=true;if(i.dataset.f==='gm'){if(/^\d{7,8}$/.test(v)){it.gm=v;delete it.other}else{delete it.gm;it.other=v||undefined}}else it.acd=v||undefined;it.sent=false;save();render()});
-$('list').addEventListener('click',e=>{const pb=e.target.closest('[data-pic]');if(pb){showPic(pb.dataset.pic);return}const b=e.target.closest('[data-del]');if(!b)return;dropThumb(items[+b.dataset.del].upc);items.splice(+b.dataset.del,1);save();render()});
+$('list').addEventListener('change',e=>{const i=e.target.closest('input');if(!i)return;const it=items[+i.dataset.n];if(!it)return;const row=i.closest('.item');setManual(it,row.querySelector('[data-f=part]').value,row.querySelector('[data-f=alt]').value)||(it.part='');render()});
+$('list').addEventListener('click',e=>{const pb=e.target.closest('[data-pic]');if(pb){showPic(pb.dataset.pic);return}const b=e.target.closest('[data-del]');if(!b)return;const it=items[+b.dataset.del];dropThumb(it.upc);delete snaps[it.upc];items.splice(+b.dataset.del,1);save();render()});
 async function showPic(upc){
   const it=items.find(i=>i.upc===upc);if(!it)return;const d=await getThumb(upc);
   const o=document.createElement('div');o.className='pic';
-  o.innerHTML='<div class="upc">UPC '+esc(upc)+'</div>'+(d?'<img alt="">':'<div class="msg">No picture saved for this one.</div>')+'<div class="pn"><input id="pgm" placeholder="GM / part #" inputmode="text" autocapitalize="characters"><input id="pacd" class="acd" placeholder="ACD #" autocapitalize="characters"></div><div class="row"><button class="pri" id="psave">Save</button><button id="pclose">Close</button></div>';
+  o.innerHTML='<div class="upc">UPC '+esc(upc)+'</div>'+(d?'<img alt="">':'<div class="msg">No picture saved for this one.</div>')+'<div class="pn"><input id="pgm" placeholder="Part #" autocapitalize="characters"><input id="pacd" class="acd" placeholder="2nd # (optional)" autocapitalize="characters"></div><div class="row"><button class="pri" id="psave">Save</button><button id="pclose">Close</button></div>';
   if(d)o.querySelector('img').src=d;
-  o.querySelector('#pgm').value=it.gm||it.other||'';o.querySelector('#pacd').value=it.acd||'';
+  o.querySelector('#pgm').value=it.part||'';o.querySelector('#pacd').value=it.alt||'';
   document.body.appendChild(o);const was=paused;paused=true;
   const close=()=>{o.remove();paused=was};
   o.querySelector('#pclose').onclick=close;
-  o.querySelector('#psave').onclick=()=>{const g=o.querySelector('#pgm').value.trim().toUpperCase(),a=o.querySelector('#pacd').value.trim().toUpperCase();
-    if(g||a){it.manual=true;if(/^\d{7,8}$/.test(g)){it.gm=g;delete it.other}else{delete it.gm;it.other=g||undefined}it.acd=a||undefined;it.sent=false;save();dropThumb(upc);beep(S.hit)}close();render()};
+  o.querySelector('#psave').onclick=()=>{if(setManual(it,o.querySelector('#pgm').value,o.querySelector('#pacd').value))beep(S.hit);close();render()};
 }
-function payload(all){return items.filter(i=>(all||!i.sent)&&(i.gm||i.acd||i.other)).map(i=>[i.upc,i.gm||i.other||i.acd,i.gm?'GM':(i.other?'':'ACD'),i.gm&&i.acd&&(i.acdOk||i.manual)?i.acd:''].join(':')).join(',')}
-$('send').onclick=()=>{const p=payload(false);if(!p){toast('Nothing new to send.',true);return}beep(S.send);items.forEach(i=>{if(i.gm||i.acd||i.other)i.sent=true});save();render();window.open(SCANNER+'#learn='+encodeURIComponent(p),'_blank')};
+const BCODE={GM:'GM',ACDelco:'ACD',Ford:'FORD',Motorcraft:'FORD',Mopar:'OTH'};
+function payload(all){return items.filter(i=>(all||!i.sent)&&i.part).map(i=>[i.upc,i.part,BCODE[i.brand]||'',i.alt&&(i.altOk||i.manual)?i.alt:''].join(':')).join(',')}
+$('send').onclick=()=>{const p=payload(false);if(!p){toast('Nothing new to send.',true);return}beep(S.send);items.forEach(i=>{if(i.part)i.sent=true});save();render();window.open(SCANNER+'#learn='+encodeURIComponent(p),'_blank')};
 $('copy').onclick=async()=>{const p=payload(true);try{await navigator.clipboard.writeText('LEARN '+p);toast('Copied. Paste it into the scanner\'s Import box.')}catch(e){toast('Copy blocked.',true)}};
 $('clear').onclick=()=>{items=items.filter(i=>!i.sent);save();render()};
 $('pause').onclick=()=>{paused=!paused;$('pause').classList.toggle('on',paused);$('pause').textContent=paused?'Resume':'Pause';$('hud').textContent=paused?'Paused':'Point at a label'};
 $('torch').onclick=async()=>{const on=!$('torch').classList.contains('on');try{await track.applyConstraints({advanced:[{torch:on}]});$('torch').classList.toggle('on',on)}catch(e){}};
+function stopCam(){try{stream&&stream.getTracks().forEach(t=>t.stop())}catch(e){}stream=null;track=null;$('vid').srcObject=null;try{wake&&wake.release()}catch(e){}wake=null;$('camv').hidden=true;$('startv').hidden=false;$('go').textContent='Start camera';$('torch').classList.remove('on');paused=false;$('pause').classList.remove('on');$('pause').textContent='Pause'}
+$('stop').onclick=()=>{stopCam();toast('Camera off. Everything read so far is saved.')};
 $('go').onclick=async()=>{
   beep([[1,0,.01]]);
   if(!('BarcodeDetector' in window)){$('sup').textContent='This browser has no built-in barcode reader. Use Chrome on Android.';return}
-  try{det=new BarcodeDetector({formats:['upc_a','ean_13','upc_e','code_128','code_39']})}catch(e){det=new BarcodeDetector()}
+  try{det=det||new BarcodeDetector({formats:['upc_a','ean_13','upc_e','code_128','code_39']})}catch(e){det=new BarcodeDetector()}
   try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}})}
   catch(e){$('sup').textContent='Camera blocked: '+(e.message||e.name)+'. Allow camera for this site in Chrome settings.';return}
   track=stream.getVideoTracks()[0];
   try{await track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
   try{$('torch').hidden=!(track.getCapabilities&&track.getCapabilities().torch)}catch(e){}
   $('vid').srcObject=stream;$('startv').hidden=true;$('camv').hidden=false;
-  try{if('wakeLock' in navigator)await navigator.wakeLock.request('screen')}catch(e){}
+  try{if('wakeLock' in navigator)wake=await navigator.wakeLock.request('screen')}catch(e){}
   tick();
   $('hud').textContent=worker?'Point at a label: barcode and numbers in view':'Loading text reader (first time only)…';
 };
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&stream&&!stream.active)location.reload()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&stream&&!stream.active)stopCam()});
 render();
 })();
 </script>

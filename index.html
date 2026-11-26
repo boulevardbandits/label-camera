@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Label Camera</title>
+<meta name="theme-color" content="#101114">
+<style>
+:root{--bg:#101114;--card:#1d1f24;--line:#2e3138;--ink:#f2f2f2;--mute:#9aa0aa;--ok:#3fbf73;--warn:#ffb347;--bad:#ef6b62;--blue:#4b74d6}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.4 system-ui,-apple-system,Roboto,sans-serif}
+.cam{position:relative;background:#000;aspect-ratio:4/3;max-height:58vh;width:100%;overflow:hidden}
+video{width:100%;height:100%;object-fit:cover;display:block}
+.frame{position:absolute;inset:12% 8%;border:3px solid #fff8;border-radius:14px;pointer-events:none;transition:border-color .15s}
+.frame.hit{border-color:var(--ok)}
+.hud{position:absolute;left:0;right:0;bottom:0;padding:10px 14px;background:linear-gradient(#0000,#000c);font-weight:700;font-size:16px}
+.top{position:absolute;top:10px;right:10px;display:flex;gap:8px}
+button{font:700 16px system-ui;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 14px;min-height:48px;cursor:pointer}
+button.pri{background:var(--blue);border-color:var(--blue)}
+button.on{background:#ffd60a;color:#000}
+.wrap{padding:12px 14px 40px;max-width:640px;margin:0 auto}
+.start{display:flex;flex-direction:column;gap:10px;align-items:stretch;padding:24px 14px}
+.start p{color:var(--mute);margin:0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row button{flex:1}
+.item{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center}
+.item.new{border-color:var(--ok)}
+.item.need{border-color:var(--warn)}
+.upc{font:600 13px ui-monospace,Menlo,monospace;color:var(--mute)}
+.pn{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pn input{font:800 20px ui-monospace,Menlo,monospace;width:9.5em;max-width:100%;padding:6px 8px;border-radius:9px;border:1px solid var(--line);background:#0a0a0c;color:#fff;text-transform:uppercase}
+.pn input.acd{font-size:15px;width:8em}
+.item button{min-height:40px;padding:6px 10px;font-size:14px}
+.sent{font-size:12px;color:var(--ok)}
+h2{font-size:16px;margin:18px 0 4px;display:flex;align-items:center;gap:8px}
+h2 span{margin-left:auto;font-size:13px;color:var(--mute)}
+.msg{color:var(--mute);font-size:14px;margin-top:8px}
+.toast{position:fixed;left:12px;right:12px;bottom:14px;background:#0a7d3c;color:#fff;border-radius:14px;padding:12px 14px;font-weight:700;opacity:0;transition:.2s;pointer-events:none;text-align:center}
+.toast.on{opacity:1}.toast.bad{background:#b3261e}
+</style>
+</head><body>
+<div id="startv" class="start">
+  <h1 style="margin:0;font-size:24px">Label Camera</h1>
+  <p>Point at a GM / ACDelco label. It grabs the UPC barcode, reads the GM# and ACD# printed on the label, beeps, and remembers it. Then tap <b>Send to scanner</b> to teach the Iowa scanner every UPC at once.</p>
+  <button class="pri" id="go">Start camera</button>
+  <p id="sup"></p>
+</div>
+<div id="camv" hidden>
+  <div class="cam"><video id="vid" playsinline muted autoplay></video><div class="frame" id="frame"></div>
+    <div class="top"><button id="torch" hidden>Light</button><button id="pause">Pause</button></div>
+    <div class="hud" id="hud">Starting…</div></div>
+</div>
+<div class="wrap">
+  <div class="row"><button class="pri" id="send">Send to scanner</button><button id="copy">Copy list</button></div>
+  <div class="msg" id="msg"></div>
+  <h2>Labels read <span id="cnt"></span></h2>
+  <div id="list"></div>
+  <div class="row" style="margin-top:16px"><button id="clear">Clear sent</button></div>
+</div>
+<div class="toast" id="toast"></div>
+<canvas id="cv" hidden></canvas>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script>
+(()=>{
+const SCANNER='https://claude.ai/artifact/FoodK6kYyaWVeGxvGg7qQe';
+const $=id=>document.getElementById(id);
+const LS={get(k,d){try{const v=localStorage.getItem('lc_'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('lc_'+k,JSON.stringify(v))}catch(e){}}};
+let items=LS.get('items',[]); // {upc,gm,acd,other,at,sent,conf}
+const save=()=>LS.set('items',items);
+let stream=null,track=null,det=null,worker=null,paused=false,busy=false,lastUpc='',lastAt=0;
+let ac=null;
+function beep(seq){try{ac=ac||new AudioContext();if(ac.state==='suspended')ac.resume();for(const[f,t,d]of seq){const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;o.connect(g);g.connect(ac.destination);const s=ac.currentTime+t;g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.35,s+.008);g.gain.exponentialRampToValueAtTime(.0001,s+d);o.start(s);o.stop(s+d+.03)}}catch(e){}}
+const S={hit:[[1319,0,.07],[1760,.075,.12]],seen:[[1175,0,.06]],need:[[330,0,.15],[247,.18,.2]],send:[[784,0,.08],[1047,.08,.08],[1319,.16,.14]]};
+let toastT;function toast(t,bad){const el=$('toast');el.textContent=t;el.className='toast on'+(bad?' bad':'');clearTimeout(toastT);toastT=setTimeout(()=>el.className='toast',2600)}
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function normUpc(r){const d=String(r).replace(/\D/g,'');if(d.length===12)return d;if(d.length===13&&d[0]==='0')return d.slice(1);if(d.length===11)return '0'+d;return null}
+
+// ---------- OCR ----------
+function parseText(t){
+  const T=t.toUpperCase().replace(/[|]/g,'1').replace(/O(?=\d)/g,'0');
+  let gm=null,acd=null,m;
+  if(m=T.match(/GM\s*[#:]?\s*([0-9OIL]{7,9})/))gm=m[1].replace(/O/g,'0').replace(/[IL]/g,'1');
+  if(gm&&!/^\d{8}$/.test(gm))gm=gm.slice(0,8);
+  if(m=T.match(/AC\s*D(?:ELCO)?\s*[#:]?\s*([A-Z0-9][A-Z0-9\-]{2,14})/))acd=m[1].replace(/-+$/,'');
+  if(!gm){const c=(T.match(/\b[12489]\d{7}\b/g)||[]).filter(x=>!/^7?07773/.test(x));if(c.length)gm=c[0]}
+  return{gm,acd};
+}
+async function ocrFrame(){
+  const v=$('vid'),cv=$('cv');const w=v.videoWidth,h=v.videoHeight;if(!w)return{};
+  const sc=Math.min(1,1600/w);cv.width=Math.round(w*sc);cv.height=Math.round(h*sc);
+  const x=cv.getContext('2d',{willReadFrequently:true});x.filter='grayscale(1) contrast(1.4)';x.drawImage(v,0,0,cv.width,cv.height);
+  const r=await worker.recognize(cv);return parseText(r.data.text||'');
+}
+// ---------- loop ----------
+async function tick(){
+  if(!stream)return;
+  if(!paused&&!busy&&det){
+    busy=true;
+    try{
+      const codes=await det.detect($('vid'));
+      const c=codes.map(b=>normUpc(b.rawValue)).find(Boolean);
+      if(c){
+        $('frame').classList.add('hit');
+        const known=items.find(i=>i.upc===c&&(i.gm||i.acd||i.other));
+        if(known){if(c!==lastUpc||Date.now()-lastAt>4000){beep(S.seen);$('hud').textContent='Already have '+c+' → '+(known.gm||known.acd||known.other);lastUpc=c;lastAt=Date.now()}}
+        else if(worker){
+          $('hud').textContent='UPC '+c+' · reading label…';
+          let got={};for(let k=0;k<3&&!(got.gm||got.acd);k++)got=await ocrFrame();
+          upsert(c,got);
+          if(got.gm||got.acd){beep(S.hit);$('hud').textContent='✓ '+c+' → '+(got.gm?'GM '+got.gm:'')+(got.acd?' ACD '+got.acd:'');navigator.vibrate&&navigator.vibrate(40)}
+          else{beep(S.need);$('hud').textContent='Got UPC '+c+', couldn\'t read the number. Hold closer, or type it below.'}
+          lastUpc=c;lastAt=Date.now();
+        }
+      }else{$('frame').classList.remove('hit');if(Date.now()-lastAt>3000)$('hud').textContent=worker?'Point at a label: barcode and GM# in view':'Loading text reader…'}
+    }catch(e){$('hud').textContent='Camera error: '+(e.message||e)}
+    busy=false;
+  }
+  setTimeout(tick,250);
+}
+function upsert(upc,got){
+  let it=items.find(i=>i.upc===upc);
+  if(!it){it={upc,at:Date.now()};items.unshift(it)}
+  if(got.gm)it.gm=got.gm;if(got.acd)it.acd=got.acd;it.sent=false;save();render(upc);
+}
+// ---------- UI ----------
+function render(flash){
+  const un=items.filter(i=>!i.sent&&(i.gm||i.acd||i.other)).length;
+  $('cnt').textContent=items.length+' total · '+un+' not sent';
+  $('send').textContent=un?'Send '+un+' to scanner':'Send to scanner';
+  $('list').innerHTML=items.map((i,n)=>'<div class="item'+(i.upc===flash?' new':'')+(!(i.gm||i.acd||i.other)?' need':'')+'"><div><div class="upc">UPC '+esc(i.upc)+(i.sent?' <span class="sent">✓ sent</span>':'')+'</div><div class="pn"><input data-n="'+n+'" data-f="gm" value="'+esc(i.gm||i.other||'')+'" placeholder="GM / part #" autocapitalize="characters"><input class="acd" data-n="'+n+'" data-f="acd" value="'+esc(i.acd||'')+'" placeholder="ACD #" autocapitalize="characters"></div></div><button data-del="'+n+'">✕</button></div>').join('')||'<div class="msg">Nothing yet. Start the camera and point it at a label.</div>';
+}
+$('list').addEventListener('change',e=>{const i=e.target.closest('input');if(!i)return;const it=items[+i.dataset.n];if(!it)return;const v=i.value.trim().toUpperCase();if(i.dataset.f==='gm'){if(/^\d{7,8}$/.test(v)){it.gm=v;delete it.other}else{delete it.gm;it.other=v||undefined}}else it.acd=v||undefined;it.sent=false;save();render()});
+$('list').addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;items.splice(+b.dataset.del,1);save();render()});
+function payload(all){return items.filter(i=>(all||!i.sent)&&(i.gm||i.acd||i.other)).map(i=>[i.upc,i.gm||i.other||i.acd,i.gm?'GM':(i.other?'':'ACD'),i.gm&&i.acd?i.acd:''].join(':')).join(',')}
+$('send').onclick=()=>{const p=payload(false);if(!p){toast('Nothing new to send.',true);return}beep(S.send);items.forEach(i=>{if(i.gm||i.acd||i.other)i.sent=true});save();render();window.open(SCANNER+'#learn='+encodeURIComponent(p),'_blank')};
+$('copy').onclick=async()=>{const p=payload(true);try{await navigator.clipboard.writeText('LEARN '+p);toast('Copied. Paste it into the scanner\'s Import box.')}catch(e){toast('Copy blocked.',true)}};
+$('clear').onclick=()=>{items=items.filter(i=>!i.sent);save();render()};
+$('pause').onclick=()=>{paused=!paused;$('pause').classList.toggle('on',paused);$('pause').textContent=paused?'Resume':'Pause';$('hud').textContent=paused?'Paused':'Point at a label'};
+$('torch').onclick=async()=>{const on=!$('torch').classList.contains('on');try{await track.applyConstraints({advanced:[{torch:on}]});$('torch').classList.toggle('on',on)}catch(e){}};
+$('go').onclick=async()=>{
+  beep([[1,0,.01]]);
+  if(!('BarcodeDetector' in window)){$('sup').textContent='This browser has no built-in barcode reader. Use Chrome on Android.';return}
+  try{det=new BarcodeDetector({formats:['upc_a','ean_13','upc_e','code_128','code_39']})}catch(e){det=new BarcodeDetector()}
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}})}
+  catch(e){$('sup').textContent='Camera blocked: '+(e.message||e.name)+'. Allow camera for this site in Chrome settings.';return}
+  track=stream.getVideoTracks()[0];
+  try{await track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
+  try{$('torch').hidden=!(track.getCapabilities&&track.getCapabilities().torch)}catch(e){}
+  $('vid').srcObject=stream;$('startv').hidden=true;$('camv').hidden=false;
+  try{if('wakeLock' in navigator)await navigator.wakeLock.request('screen')}catch(e){}
+  tick();
+  try{$('hud').textContent='Loading text reader (first time only)…';worker=await Tesseract.createWorker('eng');await worker.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#-. '});$('hud').textContent='Point at a label: barcode and GM# in view'}
+  catch(e){$('hud').textContent='Text reader failed to load ('+(e.message||e)+'). UPCs still save; type the numbers.';worker=null}
+};
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&stream&&!stream.active)location.reload()});
+render();
+})();
+</script>
+</body></html>

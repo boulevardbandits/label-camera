@@ -103,11 +103,11 @@ function fordify(u){let m;
   if(m=u.match(/^([A-Z0-9]{4})-?(\d{1,3}[A-Z]{0,2}\d{2,4}[A-Z0-9]{0,3})-?([A-Z]{1,3}\d?)$/))if(/[A-Z]/.test(m[1])&&(m[1][3]==='Z'||u.includes('-')))return m[1]+'-'+m[2]+'-'+m[3];
   return null}
 function codePart(raw){
-  let u=String(raw).replace(/[\u0000-\u001f]/g,'').trim().replace(/^\][A-Za-z]\d/,'').toUpperCase().replace(/\s+/g,'');
+  let m,u=String(raw).replace(/[\u0000-\u001f]/g,'').trim().replace(/^\][A-Za-z]\d/,'').toUpperCase().replace(/\s+/g,'');
   if(!u||/^Q\d{1,5}$/.test(u)||/^HTTP/.test(u)||/^\d+$/.test(u))return null;
   if(/^P[A-Z0-9]{3}Z-?\d/.test(u))u=u.slice(1);
   let f=fordify(u);if(f)return{part:f,brand:'Ford'};
-  if(/^P?\d{8}A[A-Z]$/.test(u))return{part:u.replace(/^P/,''),brand:'Mopar'};
+  if((m=u.match(/^P?(\d{8}A[A-Z])(-?\d{3})?$/)))return{part:m[1],brand:'Mopar'};
   if(/^P?[A-Z]{2,4}-\d[0-9A-Z]{0,6}(-\d{2,4})?$/.test(u))return{part:u.replace(/^P(?=[A-Z]{2,4}-)/,''),brand:'Motorcraft'};
   return null}
 
@@ -132,9 +132,11 @@ function parseText(t){
     if(!r.acd&&(m=L.match(/A?[CO]?[DO0P]\s*#\s*([A-Z0-9][A-Z0-9\- ]{2,16})/))){const v=m[1].replace(/ /g,'').replace(/-+$/,'');if(/\d/.test(v)&&v.length>=4)r.acd=v}
   }
   if(!r.acd){for(const L of lines){if(/QTY|LC\s?\d|GR\./.test(L))continue;const c=L.match(ACD_RE);if(c){r.acd=c[1];break}}}
-  if((m=T.match(FORD_RE)))r.ford=m[1]+'-'+m[2]+'-'+m[3];
+  if((m=T.match(FORD_RE))){let a=m[1];if(/[A-Z]/.test(a.slice(0,a.length-1))&&/[27]$/.test(a))a=a.slice(0,-1)+'Z';r.ford=a+'-'+m[2]+'-'+m[3]}
   if((m=T.match(/(?<![0-9A-Z])(\d{8}A[A-Z])(?![0-9A-Z])/)))r.mopar=m[1];
-  if(!r.gm&&!r.ford){const c=(T.match(/(?<![\dA-Z.\-])[1-9]\d{7}(?![\dA-Z.\-])/g)||[]).filter(x=>!UPCISH.test(x));if(c.length)r.gm=c[0]}
+  else if((m=T.match(/(?<![0-9A-Z])(\d{4}) ?(\d{4}) ?(A[A-Z])(?![0-9A-Z])/)))r.mopar=m[1]+m[2]+m[3];
+  if(!r.gm&&(m=T.match(/[A-Z]\d{2}-\d{3}-[A-Z0-9]{2}\s+(\d{4})\s?(\d{4})(?![\dA-Z])/)))r.gm=m[1]+m[2]; // dealer bin sticker
+  if(!r.gm&&!r.ford){const c=(T.match(/(?<![\dA-Z.\-])[1-9]\d{7}(?![\dA-Z.\-])/g)||[]).filter(x=>!UPCISH.test(x)&&!/^20[0-3]\d(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])$/.test(x));if(c.length)r.gm=c[0]}
   if(!r.gm){for(const mm of T.matchAll(MC_RE)){if(MC_NOT.test(mm[1]))continue;const v=mm[1]+'-'+mm[2];if(r.acd===v||(r.ford&&r.ford.startsWith(v)))continue;r.mc=v;break}}
   return r;
 }
@@ -190,6 +192,7 @@ function lineCanvas(src,L,k,th){
   const h=L.h/k,pad=h*.4,x=L.x0/k-pad,y=L.y0/k-pad,w=(L.x1-L.x0)/k+2*pad,hh=(L.y1-L.y0)/k+2*pad,s=th/h;
   const c=document.createElement('canvas');c.width=Math.max(8,Math.round(w*s));c.height=Math.max(8,Math.round(hh*s));
   const x2=c.getContext('2d');x2.fillStyle='#fff';x2.fillRect(0,0,c.width,c.height);x2.imageSmoothingQuality='high';x2.drawImage(src,x,y,w,hh,0,0,c.width,c.height);return c}
+function rot90(src,dir){const c=document.createElement('canvas');c.width=src.height;c.height=src.width;const x=c.getContext('2d');x.translate(c.width/2,c.height/2);x.rotate(dir*Math.PI/2);x.drawImage(src,-src.width/2,-src.height/2);return c}
 function scaled(src,k){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(src.width*k));c.height=Math.max(1,Math.round(src.height*k));c.getContext('2d').drawImage(src,0,0,c.width,c.height);return c}
 
 // ---------- OCR pool: several readers working at once ----------
@@ -206,7 +209,7 @@ function drain(){for(const w of pool){if(w.busy||!q.length)continue;const j=q.sh
 // ---------- snapshots around a barcode ----------
 // Region in barcode widths (barcode's top-left = 0,0). GM/ACDelco: numbers above the
 // barcode. Motorcraft: numbers up and far left. The snapshot is deskewed with the barcode.
-const RX0=-6,RX1=2.2,RY0=-3.4,RY1=0.1;
+const RX0=-6,RX1=2.2,RY0=-3.4,RY1=0.95;
 function snap(src,b,perBw){
   const p=b.cornerPoints,bb=b.boundingBox;
   let ang=0,bw=bb.width,x0=bb.x,y0=bb.y;
@@ -216,11 +219,19 @@ function snap(src,b,perBw){
   const c=document.createElement('canvas');c.width=Math.round((RX1-RX0)*bw*s);c.height=Math.round((RY1-RY0)*bw*s);
   const x=c.getContext('2d',{willReadFrequently:true});x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.filter='grayscale(1)';
   x.translate(-RX0*bw*s,-RY0*bw*s);x.scale(s,s);x.rotate(-ang);x.translate(-x0,-y0);x.drawImage(src,0,0);
+  let bh=p&&p.length===4?Math.hypot(p[3].x-p[0].x,p[3].y-p[0].y):(bb.height||bw*.3);bh=Math.min(Math.max(bh,bw*.15),bw*.6);
+  x.setTransform(1,0,0,1,0,0);x.filter='none';x.fillStyle='#fff';x.fillRect((-RX0-.03)*bw*s,(-RY0-.03)*bw*s,1.06*bw*s,bh*s+.06*bw*s);
   c.bw=bw*s;c.srcBw=bw;return c;
 }
 // Read a picture: find its text lines, OCR each line at two sizes (two independent votes).
 // deep=true (Capture): three sizes plus a full-page pass.
+// Chrome's own text reader (Google's, on Android) when the experimental flag is on.
+let TD=null;
+(async()=>{try{if(!('TextDetector' in window))return;const t=new TextDetector();const c=document.createElement('canvas');c.width=320;c.height=80;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,320,80);x.fillStyle='#000';x.font='bold 44px Arial';x.fillText('GM# 1234',10,58);
+  const r=await t.detect(c);if(r&&r.length&&r.some(z=>z.rawValue&&/\d{3}/.test(z.rawValue))){TD=t;const el=$('sup');if(el)el.textContent='⚡ Fast Google text reader is on.'}}catch(e){}})();
+async function tdRead(c){try{const r=await TD.detect(c);const ls=r.filter(z=>z.rawValue).map(z=>({t:z.rawValue,y:z.boundingBox.y,x:z.boundingBox.x,h:z.boundingBox.height}));ls.sort((a,b)=>Math.abs(a.y-b.y)<a.h*.5?a.x-b.x:a.y-b.y);return parseText(ls.map(z=>z.t).join('\n'))}catch(e){return {}}}
 async function readPic(c,bw,prio,deep){
+  const tdp=TD?tdRead(c):null;
   const k=Math.min(1,150/bw),small=k<1?scaled(c,k):c;
   const L=findLines(small,bw*k,deep?10:7).sort((a,b)=>a.y0-b.y0||a.x0-b.x0);
   const sizes=deep?[40,54,32]:[40,54];const out=[];
@@ -228,6 +239,7 @@ async function readPic(c,bw,prio,deep){
     const texts=await Promise.all(L.map(l=>ocr(lineCanvas(c,l,k,th),'7',prio)));
     out.push(parseText(texts.join('\n')));
   }
+  if(tdp)out.push(await tdp);
   if(deep||!L.length){ // full-page pass catches anything the line finder missed
     const k2=Math.min(1.6,230/bw);const t=await ocr(scaled(c,k2),'11',prio);out.push(parseText(t));
   }
@@ -354,7 +366,9 @@ async function capture(){
       if(parts.length){for(const pc of parts)onPartCode(pc,'',Date.now());found=parts.length}
       else{
         putThumb(it.id,scaled(pic,Math.min(1,1000/pic.width)));render(it.id);
-        const rs=await readPic(pic,pic.width/5,3,true);
+        let rs=await readPic(pic,pic.width/9,3,true);
+        // nothing? the label may be sideways: try it turned both ways
+        for(const dir of [1,-1]){if(rs.some(r=>Object.keys(r).length))break;rs=await readPic(rot90(pic,dir),pic.width/9,3,true)}
         for(const r of rs)vote(it,r);
         if(it.part){found++;if(!it.ok){it.ok=true;it.capNote=1}}else it.gaveUp=true;
         save();render(it.id);
@@ -451,7 +465,7 @@ $('go').onclick=async()=>{
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&stream&&!stream.active)stopCam()});
 render();
 // test hooks (harmless in normal use)
-window.__lc={findLines,readPic,snap,parseText,codePart,capture,items:()=>items,isReady:()=>ready,setDet:d=>{det=d},setStream:s=>{stream=s},scaled};
+window.__lc={findLines,readPic,snap,parseText,codePart,capture,items:()=>items,isReady:()=>ready,setDet:d=>{det=d},setStream:s=>{stream=s},scaled,rot90};
 })();
 </script>
 </body></html>

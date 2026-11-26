@@ -7,7 +7,7 @@
 :root{--bg:#101114;--card:#1d1f24;--line:#2e3138;--ink:#f2f2f2;--mute:#9aa0aa;--ok:#3fbf73;--warn:#ffb347;--bad:#ef6b62;--blue:#4b74d6}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-html,body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.4 system-ui,-apple-system,Roboto,sans-serif}
+html,body{overflow-x:hidden;margin:0;background:var(--bg);color:var(--ink);font:17px/1.4 system-ui,-apple-system,Roboto,sans-serif}
 .cam{position:relative;background:#000;aspect-ratio:4/3;max-height:56vh;width:100%;overflow:hidden}
 video{width:100%;height:100%;object-fit:cover;display:block}
 .frame{position:absolute;inset:12% 8%;border:3px solid #fff8;border-radius:14px;pointer-events:none;transition:border-color .15s}
@@ -29,10 +29,11 @@ button.stopb{background:#b3261e;border-color:#b3261e}
 .row{display:flex;gap:8px;flex-wrap:wrap}
 .row button{flex:1}
 .lotbar{display:flex;gap:8px;align-items:stretch;margin-bottom:10px}
-.lotbar label{display:flex;align-items:center;gap:8px;flex:1;background:#0a0a0c;border:2px solid var(--blue);border-radius:12px;padding:0 12px;min-height:58px}
+.lotbar label{min-width:0;display:flex;align-items:center;gap:8px;flex:1;background:#0a0a0c;border:2px solid var(--blue);border-radius:12px;padding:0 12px;min-height:58px}
 .lotbar label span{font-weight:800;color:var(--mute);font-size:14px;letter-spacing:.06em}
-.lotbar input{flex:1;min-width:0;background:none;border:0;color:#fff;font:800 30px ui-monospace,Menlo,monospace;outline:none;padding:0}
-.lotbar button{min-width:64px;font-size:18px}
+.lotbar input{flex:1;min-width:0;width:0;background:none;border:0;color:#fff;font:800 30px ui-monospace,Menlo,monospace;outline:none;padding:0}
+.lotbar button{min-width:60px;font-size:18px;padding:10px 10px}
+.zoomb{position:absolute;top:10px;left:10px;font-size:18px;min-width:56px}
 .item{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center}
 .item.new{border-color:var(--ok)}
 .item.need{border-color:var(--warn)}
@@ -67,7 +68,7 @@ h2 span{margin-left:auto;font-size:13px;color:var(--mute)}
 </div>
 <div id="camv" hidden>
   <div class="cam"><video id="vid" playsinline muted autoplay></video><div class="frame" id="frame"></div><div class="flash" id="flash"></div>
-    <div class="top"><button id="torch" hidden>Light</button><button id="pause">Pause</button><button id="stop" class="stopb">Stop camera</button></div>
+    <button class="zoomb" id="zoom" hidden>2×</button><div class="top"><button id="torch" hidden>Light</button><button id="pause">Pause</button><button id="stop" class="stopb">Stop camera</button></div>
     <div class="hud" id="hud">Starting…</div>
     <button class="cap" id="cap"><b>📸</b>Capture</button></div>
 </div>
@@ -175,23 +176,34 @@ function findLines(c,bw,max){
   const st=new Map();
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!lab[i])continue;const r=find(lab[i]);let s=st.get(r);if(!s){s={x0:x,x1:x,y0:y,y1:y,n:0};st.set(r,s)}s.n++;if(x<s.x0)s.x0=x;if(x>s.x1)s.x1=x;if(y<s.y0)s.y0=y;if(y>s.y1)s.y1=y}
   const hmin=Math.max(7,bw*.04),hmax=bw*.34,ch=[];
-  for(const s of st.values()){const w=s.x1-s.x0+1,h=s.y1-s.y0+1;if(h<hmin||h>hmax||w>h*1.5||s.n<w*h*.12)continue;if(s.x0===0||s.y0===0||s.x1===W-1||s.y1===H-1)continue;s.h=h;ch.push(s)}
+  const dashes=[];
+  for(const s of st.values()){const w=s.x1-s.x0+1,h=s.y1-s.y0+1;if(h<hmin&&w>=h*1.4&&w<bw*.2&&h>=1)dashes.push(s);if(h<hmin||h>hmax||w>h*1.5||s.n<w*h*.12)continue;if(s.x0===0||s.y0===0||s.x1===W-1||s.y1===H-1)continue;s.h=h;ch.push(s)}
   ch.sort((a,b)=>a.x0-b.x0);
+  const dashBetween=(L,s)=>s.x0-L.x1<3*L.hl&&dashes.some(d=>d.x0>=L.x1-2&&d.x1<=s.x0+2&&(d.y0+d.y1)/2>L.y0&&(d.y0+d.y1)/2<L.y1);
   const lines=[];
   for(const s of ch){let best=null,bg=1e9;
-    for(const L of lines){const hm=Math.max(L.h,s.h),gap=s.x0-L.x1;if(gap>1.3*Math.max(L.hl,s.h)||gap<-.3*L.hl)continue;
+    for(const L of lines){const hm=Math.max(L.h,s.h),gap=s.x0-L.x1;if(gap>1.3*Math.max(L.hl,s.h)&&!dashBetween(L,s)||gap<-.3*L.hl)continue;
       const r=s.h/L.hl;if(r<.4||r>2.5)continue;
       if(Math.abs(s.y1-L.yb)>.28*hm&&Math.abs((s.y0+s.y1)/2-L.cy)>.3*hm)continue;
       if(gap<bg){bg=gap;best=L}}
-    if(best){best.x1=Math.max(best.x1,s.x1);best.y0=Math.min(best.y0,s.y0);best.y1=Math.max(best.y1,s.y1);best.h=Math.max(best.h,s.h);best.hl=s.h;best.yb=s.y1;best.cy=(s.y0+s.y1)/2;best.n++}
-    else lines.push({x0:s.x0,x1:s.x1,y0:s.y0,y1:s.y1,h:s.h,hl:s.h,yb:s.y1,cy:(s.y0+s.y1)/2,n:1})}
-  return lines.filter(L=>L.n>=3&&L.x1-L.x0>L.h*2).sort((a,b)=>b.h-a.h).slice(0,max||7);
+    if(best){best.x1=Math.max(best.x1,s.x1);best.y0=Math.min(best.y0,s.y0);best.y1=Math.max(best.y1,s.y1);best.h=Math.max(best.h,s.h);best.hl=s.h;best.yb=s.y1;best.cy=(s.y0+s.y1)/2;best.n++;best.pts.push([(s.x0+s.x1)/2,s.y1])}
+    else lines.push({x0:s.x0,x1:s.x1,y0:s.y0,y1:s.y1,h:s.h,hl:s.h,yb:s.y1,cy:(s.y0+s.y1)/2,n:1,pts:[[(s.x0+s.x1)/2,s.y1]]})}
+  const out=lines.filter(L=>L.n>=3&&L.x1-L.x0>L.h*2).sort((a,b)=>b.h-a.h).slice(0,max||7);
+  for(const L of out){ // leftover tilt of the text line (label not square to the barcode, or a bent box)
+    const P=L.pts,n=P.length;let mx=0,my=0;for(const[a,b]of P){mx+=a;my+=b}mx/=n;my/=n;let sxy=0,sxx=0;for(const[a,b]of P){sxy+=(a-mx)*(b-my);sxx+=(a-mx)*(a-mx)}
+    L.ang=sxx?Math.atan(Math.max(-.35,Math.min(.35,sxy/sxx))):0;if(Math.abs(L.ang)<.02)L.ang=0}
+  return out;
 }
 // crop one line out of the hi-res picture, scaled so its text is th px tall
 function lineCanvas(src,L,k,th){
   const h=L.h/k,pad=h*.4,x=L.x0/k-pad,y=L.y0/k-pad,w=(L.x1-L.x0)/k+2*pad,hh=(L.y1-L.y0)/k+2*pad,s=th/h;
-  const c=document.createElement('canvas');c.width=Math.max(8,Math.round(w*s));c.height=Math.max(8,Math.round(hh*s));
-  const x2=c.getContext('2d');x2.fillStyle='#fff';x2.fillRect(0,0,c.width,c.height);x2.imageSmoothingQuality='high';x2.drawImage(src,x,y,w,hh,0,0,c.width,c.height);return c}
+  const c=document.createElement('canvas');const x2=c.getContext('2d');
+  if(L.ang){ // straighten the line, and crop just its own height so the next line stays out
+    const cos=Math.cos(L.ang),lw=(L.x1-L.x0)/k/cos+2*pad,lh=h+2*pad,cx=(L.x0+L.x1)/2/k,cy=(L.y0+L.y1)/2/k;
+    c.width=Math.max(8,Math.round(lw*s));c.height=Math.max(8,Math.round(lh*s));x2.fillStyle='#fff';x2.fillRect(0,0,c.width,c.height);x2.imageSmoothingQuality='high';
+    x2.translate(c.width/2,c.height/2);x2.scale(s,s);x2.rotate(-L.ang);x2.translate(-cx,-cy);x2.drawImage(src,0,0);return c}
+  c.width=Math.max(8,Math.round(w*s));c.height=Math.max(8,Math.round(hh*s));
+  x2.fillStyle='#fff';x2.fillRect(0,0,c.width,c.height);x2.imageSmoothingQuality='high';x2.drawImage(src,x,y,w,hh,0,0,c.width,c.height);return c}
 function rot90(src,dir){const c=document.createElement('canvas');c.width=src.height;c.height=src.width;const x=c.getContext('2d');x.translate(c.width/2,c.height/2);x.rotate(dir*Math.PI/2);x.drawImage(src,-src.width/2,-src.height/2);return c}
 function scaled(src,k){const c=document.createElement('canvas');c.width=Math.max(1,Math.round(src.width*k));c.height=Math.max(1,Math.round(src.height*k));c.getContext('2d').drawImage(src,0,0,c.width,c.height);return c}
 
@@ -296,12 +308,24 @@ function onPartCode(pc,upcInFrame,now){
   it.v=it.v||{};const f=pc.brand==='Mopar'?'mopar':pc.brand==='Motorcraft'?'mc':'ford';const o=it.v[f]=it.v[f]||{};o[pc.part]=(o[pc.part]||0)+5;
   const had=it.ok;derive(it);it.sent=false;save();if(!had&&it.ok){beep(S.hit);$('hud').textContent='✓ '+label(it);render(it.id)}
 }
+// The phone's barcode reader needs ~2 px per bar. A small label in a wide frame
+// falls short, so when the full frame finds nothing, the middle is also tried enlarged.
+const cropC=document.createElement('canvas'),cropX=cropC.getContext('2d');let flip=0;
+async function detectFrame(){
+  const v=$('vid');let codes=await det.detect(v);
+  if(codes.length||!v.videoWidth)return codes;
+  if((flip++)%2)return codes; // every other frame, to keep the loop quick
+  const W=v.videoWidth,H=v.videoHeight,cw=W*.6,ch=H*.6,cx=(W-cw)/2,cy=(H-ch)/2,k=Math.min(2,2400/cw);
+  cropC.width=Math.round(cw*k);cropC.height=Math.round(ch*k);cropX.drawImage(v,cx,cy,cw,ch,0,0,cropC.width,cropC.height);
+  codes=await det.detect(cropC);
+  return codes.map(b=>({rawValue:b.rawValue,format:b.format,boundingBox:{x:cx+b.boundingBox.x/k,y:cy+b.boundingBox.y/k,width:b.boundingBox.width/k,height:b.boundingBox.height/k},cornerPoints:(b.cornerPoints||[]).map(p=>({x:cx+p.x/k,y:cy+p.y/k}))}));
+}
 async function tick(){
   if(!stream)return;
   if(!paused&&det&&!busy){
     busy=true;
     try{
-      const codes=await det.detect($('vid'));
+      const codes=await detectFrame();
       const now=Date.now();let any=false,upcHere='';const parts=[];
       for(const b of codes){
         const c=normUpc(b.rawValue);
@@ -445,17 +469,24 @@ $('copy').onclick=async()=>{const p=payload(true);try{await navigator.clipboard.
 $('clear').onclick=()=>{items=items.filter(i=>!i.sent);save();render()};
 $('pause').onclick=()=>{paused=!paused;$('pause').classList.toggle('on',paused);$('pause').textContent=paused?'Resume':'Pause';$('hud').textContent=paused?'Paused':'Point at a label'};
 $('torch').onclick=async()=>{const on=!$('torch').classList.contains('on');try{await track.applyConstraints({advanced:[{torch:on}]});$('torch').classList.toggle('on',on)}catch(e){}};
+let zmax=1,zmin=1;
+async function setZoom(z){z=Math.max(zmin,Math.min(zmax,z));try{await track.applyConstraints({advanced:[{zoom:z}]});LS.set('zoom',z);$('zoom').textContent=(+z).toFixed(z%1?1:0)+'×'}catch(e){}}
+$('zoom').onclick=()=>{const cur=LS.get('zoom',2);const steps=[1,2,3].filter(z=>z<=zmax);const nx=steps[(steps.indexOf(cur)+1)%steps.length]||1;setZoom(nx);beep(S.seen)};
 function stopCam(){try{stream&&stream.getTracks().forEach(t=>t.stop())}catch(e){}stream=null;track=null;imgCap=null;$('vid').srcObject=null;try{wake&&wake.release()}catch(e){}wake=null;$('camv').hidden=true;$('startv').hidden=false;$('go').textContent='Start camera';$('torch').classList.remove('on');paused=false;$('pause').classList.remove('on');$('pause').textContent='Pause'}
 $('stop').onclick=()=>{stopCam();toast('Camera off. Everything read so far is saved.')};
 $('go').onclick=async()=>{
   beep([[1,0,.01]]);
   if(!('BarcodeDetector' in window)){$('sup').textContent='This browser has no built-in barcode reader. Use Chrome on Android.';return}
   try{det=det||new BarcodeDetector({formats:['upc_a','ean_13','upc_e','code_128','code_39']})}catch(e){det=new BarcodeDetector()}
-  try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}})}
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080},zoom:true}})}
   catch(e){$('sup').textContent='Camera blocked: '+(e.message||e.name)+'. Allow camera for this site in Chrome settings.';return}
   track=stream.getVideoTracks()[0];
   try{await track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}
   try{$('torch').hidden=!(track.getCapabilities&&track.getCapabilities().torch)}catch(e){}
+  // Zoom crops the camera sensor itself, so small labels get real extra detail
+  // and you can hold the phone back far enough to stay in focus.
+  try{const zc=track.getCapabilities().zoom;if(zc&&zc.max>=1.5){zmax=zc.max;zmin=zc.min||1;$('zoom').hidden=false;await setZoom(LS.get('zoom',Math.min(2,zmax)))}}catch(e){}
+  setTimeout(()=>{try{const st=track.getSettings();$('msg').textContent='Camera '+st.width+'×'+st.height+(st.zoom?' · '+(+st.zoom).toFixed(1)+'× zoom':'')}catch(e){}},1500);
   try{if('ImageCapture' in window)imgCap=new ImageCapture(track)}catch(e){imgCap=null}
   $('vid').srcObject=stream;$('startv').hidden=true;$('camv').hidden=false;
   try{if('wakeLock' in navigator)wake=await navigator.wakeLock.request('screen')}catch(e){}
@@ -465,7 +496,7 @@ $('go').onclick=async()=>{
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&stream&&!stream.active)stopCam()});
 render();
 // test hooks (harmless in normal use)
-window.__lc={findLines,readPic,snap,parseText,codePart,capture,items:()=>items,isReady:()=>ready,setDet:d=>{det=d},setStream:s=>{stream=s},scaled,rot90};
+window.__lc={lineCanvas,ocr,findLines,readPic,snap,parseText,codePart,capture,items:()=>items,isReady:()=>ready,setDet:d=>{det=d},setStream:s=>{stream=s},scaled,rot90};
 })();
 </script>
 </body></html>

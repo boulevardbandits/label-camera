@@ -75,61 +75,108 @@ function normUpc(r){const d=String(r).replace(/\D/g,'');if(d.length===12)return 
 
 // ---------- OCR ----------
 function parseText(t){
-  const T=t.toUpperCase().replace(/[|]/g,'1').replace(/O(?=\d)/g,'0');
+  const lines=t.toUpperCase().replace(/[|]/g,'1').split(/\n+/).map(s=>s.trim()).filter(Boolean);
   let gm=null,acd=null,m;
-  if(m=T.match(/GM\s*[#:]?\s*([0-9OIL]{7,9})/))gm=m[1].replace(/O/g,'0').replace(/[IL]/g,'1');
-  if(gm&&!/^\d{8}$/.test(gm))gm=gm.slice(0,8);
-  if(m=T.match(/AC\s*D(?:ELCO)?\s*[#:]?\s*([A-Z0-9][A-Z0-9\-]{2,14})/))acd=m[1].replace(/-+$/,'');
-  if(!gm){const c=(T.match(/\b[12489]\d{7}\b/g)||[]).filter(x=>!/^7?07773/.test(x));if(c.length)gm=c[0]}
+  for(const L of lines){
+    if(!gm&&(m=L.match(/G[MN]\s*[#:]?\s*([0-9OIL ]{8,10})/))){const d=m[1].replace(/O/g,'0').replace(/[IL]/g,'1').replace(/ /g,'');if(/^\d{8}$/.test(d))gm=d}
+    if(!acd&&(m=L.match(/A?[CO]?[DO0]\s*#\s*([A-Z0-9][A-Z0-9\- ]{2,16})/))){const v=m[1].replace(/ /g,'').replace(/-+$/,'');if(/\d/.test(v)&&v.length>=4)acd=v}
+  }
+  if(!gm){for(const L of lines){const c=L.replace(/ /g,'');if(/^[1-9]\d{7}$/.test(c)&&!/^7?07773/.test(c)){gm=c;break}}}
+  if(!gm){const c=(t.match(/\b[1-9]\d{7}\b/g)||[]).filter(x=>!/^7?07773/.test(x));if(c.length)gm=c[0]}
   return{gm,acd};
 }
-async function ocrFrame(){
-  const v=$('vid'),cv=$('cv');const w=v.videoWidth,h=v.videoHeight;if(!w)return{};
-  const sc=Math.min(1,1600/w);cv.width=Math.round(w*sc);cv.height=Math.round(h*sc);
-  const x=cv.getContext('2d',{willReadFrequently:true});x.filter='grayscale(1) contrast(1.4)';x.drawImage(v,0,0,cv.width,cv.height);
-  const r=await worker.recognize(cv);return parseText(r.data.text||'');
+// Crop just the GM#/ACD# area: on GM labels it sits right above the barcode, same left edge.
+// Deskews using the barcode's corner points and scales so the text is a good size for OCR.
+const cv=$('cv'),cx=cv.getContext('2d',{willReadFrequently:true});
+const SCALES=[250,220,285];let scaleI=0;
+function cropFor(b,aligned){
+  const v=$('vid');const p=b.cornerPoints,bb=b.boundingBox;
+  let ang=0,bw=bb.width,x0=bb.x,y0=bb.y;
+  if(!aligned&&p&&p.length===4){ang=Math.atan2(p[1].y-p[0].y,p[1].x-p[0].x);bw=Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y);x0=p[0].x;y0=p[0].y}
+  if(bw<40)return null;
+  const s=Math.max(.5,Math.min(3,SCALES[scaleI++%SCALES.length]/bw));
+  cv.width=Math.round(1.7*bw*s);cv.height=Math.round(1.1*bw*s);
+  cx.setTransform(1,0,0,1,0,0);cx.filter='none';cx.fillStyle='#fff';cx.fillRect(0,0,cv.width,cv.height);
+  cx.filter='grayscale(1)';
+  cx.translate(.18*bw*s,1.25*bw*s);cx.scale(s,s);cx.rotate(-ang);cx.translate(-x0,-y0);
+  cx.drawImage(v,0,0);
+  cx.setTransform(1,0,0,1,0,0);
+  return cv;
+}
+let ocrBusy=false;
+async function ocrCode(upc,b){
+  if(ocrBusy||!worker)return;ocrBusy=true;
+  const it=items.find(i=>i.upc===upc);
+  try{
+    it.tries=(it.tries||0)+1;
+    let got={};
+    const c=cropFor(b,it.tries%4===0); // mostly deskewed; every 4th try a straight crop
+    if(c){const r=await worker.recognize(c);got=parseText(r.data.text||'')}
+    vote(it,got);
+  }catch(e){}
+  ocrBusy=false;
+}
+function vote(it,got){
+  it.v=it.v||{gm:{},acd:{}};
+  if(got.gm)it.v.gm[got.gm]=(it.v.gm[got.gm]||0)+1;
+  if(got.acd)it.v.acd[got.acd]=(it.v.acd[got.acd]||0)+1;
+  const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1])[0];
+  const was=it.gm||'',hadOk=!!it.ok;
+  if(!it.manual){const g=top(it.v.gm),a=top(it.v.acd);if(g){it.gm=g[0];it.ok=g[1]>=2}if(a){it.acd=a[0];it.acdOk=a[1]>=2}if(g||a)delete it.other}
+  it.reads=(it.reads||0)+((got.gm||got.acd)?1:0);
+  it.sent=false;save();
+  if(!hadOk&&it.ok){beep(S.hit);navigator.vibrate&&navigator.vibrate(40);$('hud').textContent='✓ GM '+it.gm+(it.acd?'  ACD '+it.acd:'');render(it.upc)}
+  else if(!it.ok&&it.gm){$('hud').textContent='GM '+it.gm+'? checking…';if(was!==it.gm)render()}
+  else render();
 }
 // ---------- loop ----------
+const seen={}; // upc -> last time in view
+let needT=null;
 async function tick(){
   if(!stream)return;
-  if(!paused&&!busy&&det){
+  if(!paused&&det&&!busy){
     busy=true;
     try{
       const codes=await det.detect($('vid'));
-      const c=codes.map(b=>normUpc(b.rawValue)).find(Boolean);
-      if(c){
-        $('frame').classList.add('hit');
-        const known=items.find(i=>i.upc===c&&(i.gm||i.acd||i.other));
-        if(known){if(c!==lastUpc||Date.now()-lastAt>4000){beep(S.seen);$('hud').textContent='Already have '+c+' → '+(known.gm||known.acd||known.other);lastUpc=c;lastAt=Date.now()}}
-        else if(worker){
-          $('hud').textContent='UPC '+c+' · reading label…';
-          let got={};for(let k=0;k<3&&!(got.gm||got.acd);k++)got=await ocrFrame();
-          upsert(c,got);
-          if(got.gm||got.acd){beep(S.hit);$('hud').textContent='✓ '+c+' → '+(got.gm?'GM '+got.gm:'')+(got.acd?' ACD '+got.acd:'');navigator.vibrate&&navigator.vibrate(40)}
-          else{beep(S.need);$('hud').textContent='Got UPC '+c+', couldn\'t read the number. Hold closer, or type it below.'}
-          lastUpc=c;lastAt=Date.now();
-        }
-      }else{$('frame').classList.remove('hit');if(Date.now()-lastAt>3000)$('hud').textContent=worker?'Point at a label: barcode and GM# in view':'Loading text reader…'}
+      const now=Date.now();let any=false;
+      for(const b of codes){
+        const c=normUpc(b.rawValue);if(!c)continue;any=true;
+        let it=items.find(i=>i.upc===c);
+        if(!it){it={upc:c,at:now};items.unshift(it);save();render(c);beep(S.seen);$('hud').textContent='UPC '+c+' · reading…';
+          clearTimeout(needT);needT=setTimeout(()=>{const x=items.find(i=>i.upc===c);if(x&&!(x.gm||x.acd||x.other)){beep(S.need);$('hud').textContent='No number yet for '+c+'. Hold a bit closer.'}},2500)}
+        else if(!seen[c]||now-seen[c]>3000){beep(S.seen);if(it.gm||it.acd)$('hud').textContent='Have '+c+' → '+(it.gm||it.acd)}
+        seen[c]=now;
+        // keep reading while it's in view: until resolved, then 2 more confirming reads
+        if(!it.manual&&(!it.ok||(it.reads||0)<4)&&(it.tries||0)<14)ocrCode(c,b);
+      }
+      $('frame').classList.toggle('hit',any);
+      if(!any&&now-Math.max(0,...Object.values(seen))>3000)$('hud').textContent=worker?'Point at a label: barcode and GM# in view':'Loading text reader…';
     }catch(e){$('hud').textContent='Camera error: '+(e.message||e)}
     busy=false;
   }
-  setTimeout(tick,250);
+  setTimeout(tick,120);
 }
 function upsert(upc,got){
   let it=items.find(i=>i.upc===upc);
   if(!it){it={upc,at:Date.now()};items.unshift(it)}
   if(got.gm)it.gm=got.gm;if(got.acd)it.acd=got.acd;it.sent=false;save();render(upc);
 }
+// text reader loads as soon as the page opens, not when the camera starts
+const workerReady=(async()=>{
+  try{worker=await Tesseract.createWorker('eng');await worker.setParameters({tessedit_pageseg_mode:'11'});if(stream)$('hud').textContent='Point at a label: barcode and GM# in view'}
+  catch(e){worker=null;if(stream)$('hud').textContent='Text reader failed to load. UPCs still save; type the numbers.'}
+})();
 // ---------- UI ----------
 function render(flash){
+  const ae=document.activeElement;if(ae&&ae.closest&&ae.closest('#list')&&ae.tagName==='INPUT'){clearTimeout(render.t);render.t=setTimeout(()=>render(flash),800);return}
   const un=items.filter(i=>!i.sent&&(i.gm||i.acd||i.other)).length;
   $('cnt').textContent=items.length+' total · '+un+' not sent';
   $('send').textContent=un?'Send '+un+' to scanner':'Send to scanner';
-  $('list').innerHTML=items.map((i,n)=>'<div class="item'+(i.upc===flash?' new':'')+(!(i.gm||i.acd||i.other)?' need':'')+'"><div><div class="upc">UPC '+esc(i.upc)+(i.sent?' <span class="sent">✓ sent</span>':'')+'</div><div class="pn"><input data-n="'+n+'" data-f="gm" value="'+esc(i.gm||i.other||'')+'" placeholder="GM / part #" autocapitalize="characters"><input class="acd" data-n="'+n+'" data-f="acd" value="'+esc(i.acd||'')+'" placeholder="ACD #" autocapitalize="characters"></div></div><button data-del="'+n+'">✕</button></div>').join('')||'<div class="msg">Nothing yet. Start the camera and point it at a label.</div>';
+  $('list').innerHTML=items.map((i,n)=>'<div class="item'+(i.upc===flash?' new':'')+((!(i.gm||i.acd||i.other)||(i.gm&&!i.ok&&!i.manual))?' need':'')+'"><div><div class="upc">UPC '+esc(i.upc)+(i.sent?' <span class="sent">✓ sent</span>':'')+'</div><div class="pn"><input data-n="'+n+'" data-f="gm" value="'+esc(i.gm||i.other||'')+'" placeholder="GM / part #" autocapitalize="characters"><input class="acd" data-n="'+n+'" data-f="acd" value="'+esc(i.acd||'')+'" placeholder="ACD #" autocapitalize="characters"></div></div><button data-del="'+n+'">✕</button></div>').join('')||'<div class="msg">Nothing yet. Start the camera and point it at a label.</div>';
 }
-$('list').addEventListener('change',e=>{const i=e.target.closest('input');if(!i)return;const it=items[+i.dataset.n];if(!it)return;const v=i.value.trim().toUpperCase();if(i.dataset.f==='gm'){if(/^\d{7,8}$/.test(v)){it.gm=v;delete it.other}else{delete it.gm;it.other=v||undefined}}else it.acd=v||undefined;it.sent=false;save();render()});
+$('list').addEventListener('change',e=>{const i=e.target.closest('input');if(!i)return;const it=items[+i.dataset.n];if(!it)return;const v=i.value.trim().toUpperCase();it.manual=true;if(i.dataset.f==='gm'){if(/^\d{7,8}$/.test(v)){it.gm=v;delete it.other}else{delete it.gm;it.other=v||undefined}}else it.acd=v||undefined;it.sent=false;save();render()});
 $('list').addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b)return;items.splice(+b.dataset.del,1);save();render()});
-function payload(all){return items.filter(i=>(all||!i.sent)&&(i.gm||i.acd||i.other)).map(i=>[i.upc,i.gm||i.other||i.acd,i.gm?'GM':(i.other?'':'ACD'),i.gm&&i.acd?i.acd:''].join(':')).join(',')}
+function payload(all){return items.filter(i=>(all||!i.sent)&&(i.gm||i.acd||i.other)).map(i=>[i.upc,i.gm||i.other||i.acd,i.gm?'GM':(i.other?'':'ACD'),i.gm&&i.acd&&(i.acdOk||i.manual)?i.acd:''].join(':')).join(',')}
 $('send').onclick=()=>{const p=payload(false);if(!p){toast('Nothing new to send.',true);return}beep(S.send);items.forEach(i=>{if(i.gm||i.acd||i.other)i.sent=true});save();render();window.open(SCANNER+'#learn='+encodeURIComponent(p),'_blank')};
 $('copy').onclick=async()=>{const p=payload(true);try{await navigator.clipboard.writeText('LEARN '+p);toast('Copied. Paste it into the scanner\'s Import box.')}catch(e){toast('Copy blocked.',true)}};
 $('clear').onclick=()=>{items=items.filter(i=>!i.sent);save();render()};
@@ -147,8 +194,7 @@ $('go').onclick=async()=>{
   $('vid').srcObject=stream;$('startv').hidden=true;$('camv').hidden=false;
   try{if('wakeLock' in navigator)await navigator.wakeLock.request('screen')}catch(e){}
   tick();
-  try{$('hud').textContent='Loading text reader (first time only)…';worker=await Tesseract.createWorker('eng');await worker.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#-. '});$('hud').textContent='Point at a label: barcode and GM# in view'}
-  catch(e){$('hud').textContent='Text reader failed to load ('+(e.message||e)+'). UPCs still save; type the numbers.';worker=null}
+  $('hud').textContent=worker?'Point at a label: barcode and GM# in view':'Loading text reader (first time only)…';
 };
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&stream&&!stream.active)location.reload()});
 render();
